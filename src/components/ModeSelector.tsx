@@ -122,7 +122,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
               ? 'text-purple-600 dark:text-purple-400'
               : 'text-gray-600 dark:text-gray-300'
           }`}>
-            {reversed ? '← Hitler' : 'Hitler →'}
+            {reversed ? 'Hitler →' : '→ Hitler'}
           </span>
         </button>
 

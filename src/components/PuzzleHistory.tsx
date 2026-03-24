@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { getGameHistoryByMode, getCompletedDates, getPlayerResult, fetchPuzzleDistribution, fetchDailyDistribution } from '../services/firebase';
 import type { GameHistoryEntry, LeaderboardEntry } from '../services/firebase';
 import { getPuzzleNumberForDate } from '../utils/seededRandom';
-import { formatElapsedTime, generatePuzzleUrl, getAppUrl } from './ShareCard';
-import { shareText } from '../services/shareService';
+import { formatElapsedTime, generateShareText } from './ShareCard';
+import { captureAndSave, shareText } from '../services/shareService';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import type { GameMode } from '../types/game';
@@ -133,13 +133,30 @@ function DailyHistoryTab() {
 
 function DailyDetailView({ date, result }: { date: string; result: { name: string; steps: number; path: string[]; elapsedTime?: number | null } }) {
   const [stats, setStats] = useState<{ distribution: Record<number, number>; totalPlayers: number; leaderboard: LeaderboardEntry[] } | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [shared, setShared] = useState(false);
 
   useEffect(() => {
     fetchDailyDistribution(date).then(setStats);
   }, [date]);
 
-  const shareUrl = `${getAppUrl()}?daily=${date}`;
+  const handleSaveImage = async () => {
+    setSaving(true);
+    try {
+      await captureAndSave(result.steps, 'daily', result.path, '', date);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSharePuzzle = async () => {
+    const text = generateShareText(result.steps, 'daily', date);
+    const success = await shareText(text);
+    if (success) {
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
+  };
 
   return (
     <div className="mt-2 ml-2 mr-2 mb-1 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -174,20 +191,28 @@ function DailyDetailView({ date, result }: { date: string; result: { name: strin
         </>
       )}
 
-      {/* Share link */}
-      <button
-        onClick={async () => {
-          try { await navigator.clipboard.writeText(shareUrl); } catch { /* ignore */ }
-          setLinkCopied(true);
-          setTimeout(() => setLinkCopied(false), 2000);
-        }}
-        className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-        </svg>
-        {linkCopied ? 'Link Copied!' : 'Copy Puzzle Link'}
-      </button>
+      {/* Share buttons */}
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={handleSaveImage}
+          disabled={saving}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          {saving ? 'Saving...' : 'Save Image'}
+        </button>
+        <button
+          onClick={handleSharePuzzle}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          {shared ? 'Shared!' : 'Share Puzzle'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -269,8 +294,8 @@ function GameHistoryTab({ mode }: { mode: GameMode }) {
 
 function GameDetailView({ entry }: { entry: GameHistoryEntry }) {
   const [stats, setStats] = useState<{ distribution: Record<number, number>; totalPlayers: number; leaderboard: LeaderboardEntry[] } | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [shared, setShared] = useState(false);
 
   useEffect(() => {
     if (entry.puzzleId) {
@@ -278,27 +303,26 @@ function GameDetailView({ entry }: { entry: GameHistoryEntry }) {
     }
   }, [entry.puzzleId]);
 
-  const puzzleUrl = generatePuzzleUrl(entry.startTitle, entry.targetTitle, {
-    hardMode: entry.hardMode,
-    timer: entry.timerEnabled,
-  });
-
-  const handleShareText = async () => {
-    const header = entry.mode === 'classic' ? 'WikiPath Classic' : 'WikiPath Free Play';
-    const squares = '⬜'.repeat(Math.max(0, entry.steps - 1)) + '🎯';
-    const lines = [
-      header,
-      `🟩 ${entry.steps} ${entry.steps === 1 ? 'step' : 'steps'}`,
-    ];
-    if (entry.elapsedTime != null && entry.timerEnabled) {
-      lines.push(`⏱️ ${formatElapsedTime(entry.elapsedTime)}`);
+  const handleSaveImage = async () => {
+    setSaving(true);
+    try {
+      await captureAndSave(entry.steps, entry.mode, entry.path, entry.targetDisplayTitle);
+    } finally {
+      setSaving(false);
     }
-    lines.push(squares, '', puzzleUrl);
+  };
 
-    const success = await shareText(lines.join('\n'));
+  const handleSharePuzzle = async () => {
+    const text = generateShareText(
+      entry.steps, entry.mode, null,
+      entry.startTitle, entry.targetTitle,
+      entry.timerEnabled ? entry.elapsedTime : null,
+      { hardMode: entry.hardMode, timer: entry.timerEnabled },
+    );
+    const success = await shareText(text);
     if (success) {
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2000);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
     }
   };
 
@@ -338,26 +362,23 @@ function GameDetailView({ entry }: { entry: GameHistoryEntry }) {
       {/* Share buttons */}
       <div className="flex gap-2 mt-3">
         <button
-          onClick={async () => {
-            try { await navigator.clipboard.writeText(puzzleUrl); } catch { /* ignore */ }
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-          }}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          onClick={handleSaveImage}
+          disabled={saving}
+          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          {linkCopied ? 'Copied!' : 'Copy Link'}
+          {saving ? 'Saving...' : 'Save Image'}
         </button>
         <button
-          onClick={handleShareText}
+          onClick={handleSharePuzzle}
           className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
           </svg>
-          {shareCopied ? 'Shared!' : 'Share Result'}
+          {shared ? 'Shared!' : 'Share Puzzle'}
         </button>
       </div>
     </div>

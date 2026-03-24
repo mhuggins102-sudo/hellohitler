@@ -213,7 +213,7 @@ export function HomePage() {
               }}
               className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
             >
-              Puzzle History
+              Daily Puzzle Archive
             </button>
           </div>
 
