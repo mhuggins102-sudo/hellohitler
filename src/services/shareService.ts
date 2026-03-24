@@ -1,25 +1,32 @@
-import html2canvas from 'html2canvas';
-
 /**
  * Captures a DOM element as a PNG and opens the native share sheet to save/share.
  * On iOS this allows saving to Photos or Files.
- * Falls back to direct download on desktop.
+ * Falls back to opening image in new tab on desktop.
  */
 export async function captureAndSave(element: HTMLElement): Promise<void> {
-  // Temporarily make element visible for html2canvas capture
-  const originalStyle = element.parentElement?.style.cssText || '';
-  if (element.parentElement) {
-    element.parentElement.style.cssText = 'position:fixed;top:0;left:0;z-index:-1;opacity:0;pointer-events:none;';
+  // html2canvas requires the element to be visible and laid out.
+  // Move the parent on-screen but visually behind everything.
+  const parent = element.parentElement;
+  const originalParentStyle = parent?.getAttribute('style') || '';
+
+  if (parent) {
+    parent.setAttribute('style',
+      'position:fixed !important; top:0 !important; left:0 !important; z-index:99999 !important; pointer-events:none !important;'
+    );
   }
 
+  // Force a layout reflow so html2canvas sees correct dimensions
+  void element.offsetHeight;
+
   try {
+    // Dynamically import html2canvas to avoid issues
+    const html2canvas = (await import('html2canvas')).default;
+
     const canvas = await html2canvas(element, {
       backgroundColor: '#4338ca',
       scale: 2,
       logging: false,
       useCORS: true,
-      width: element.offsetWidth,
-      height: element.offsetHeight,
     });
 
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -36,16 +43,38 @@ export async function captureAndSave(element: HTMLElement): Promise<void> {
         await navigator.share({ files: [file] });
         return;
       } catch {
-        // User cancelled or failed, fall through to download
+        // User cancelled or failed, fall through
       }
     }
 
-    // Fallback: download
-    downloadBlob(blob, 'wikipath-result.png');
+    // Fallback: open image in new tab (works on iOS where <a download> doesn't)
+    const url = URL.createObjectURL(blob);
+
+    // Try download link first (desktop browsers)
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'wikipath-result.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // On iOS Safari, the download attribute is ignored, so also open in new tab
+    // so user can long-press to save
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(url, '_blank');
+    } else {
+      // Clean up after a delay on non-iOS
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
   } finally {
     // Restore original positioning
-    if (element.parentElement) {
-      element.parentElement.style.cssText = originalStyle;
+    if (parent) {
+      if (originalParentStyle) {
+        parent.setAttribute('style', originalParentStyle);
+      } else {
+        parent.removeAttribute('style');
+      }
     }
   }
 }
@@ -55,30 +84,17 @@ export async function captureAndSave(element: HTMLElement): Promise<void> {
  * Falls back to clipboard copy on desktop.
  */
 export async function shareText(text: string): Promise<boolean> {
-  // Try native share API first (opens share sheet on mobile)
   if (navigator.share) {
     try {
       await navigator.share({ text });
       return true;
     } catch {
-      // User cancelled - still count as handled
+      // User cancelled
       return true;
     }
   }
 
-  // Fallback: copy to clipboard
   return copyToClipboard(text);
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 /**

@@ -4,7 +4,7 @@ import { ShareCard, generateShareText } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndSave, shareText } from '../services/shareService';
-import { submitDailyResult, fetchDailyDistribution, hasSubmittedToday } from '../services/firebase';
+import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily } from '../services/firebase';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
@@ -23,7 +23,7 @@ export function VictoryModal() {
   // Check if already submitted on mount
   useEffect(() => {
     if (status !== 'won' || mode !== 'daily') return;
-    if (hasSubmittedToday()) {
+    if (hasSubmittedDaily(dailyDate || undefined)) {
       setNameSubmitted(true);
       fetchDailyDistribution(dailyDate || undefined).then(setDailyStats);
     }

@@ -77,13 +77,8 @@ export function markDailyCompleted(dateStr?: string): void {
  */
 export function hasSubmittedDaily(dateStr?: string): boolean {
   const date = dateStr || getTodayString();
-  const submitted = localStorage.getItem(SUBMITTED_KEY);
-  return submitted === date;
-}
-
-/** Alias for backwards compat */
-export function hasSubmittedToday(): boolean {
-  return hasSubmittedDaily(getTodayString());
+  const results = getStoredResults();
+  return results[date]?.submittedByPlayer === true;
 }
 
 /**
