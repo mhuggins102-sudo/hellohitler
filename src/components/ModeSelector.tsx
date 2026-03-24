@@ -12,12 +12,12 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
       {/* Logo */}
-      <div className="text-center mb-12">
+      <div className="text-center mb-6">
         <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           WikiPath
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-3 text-lg max-w-md mx-auto">
-          Use Wikipedia links to navigate from one random topic to another.
+          Use Wikipedia links to navigate from<br />one random topic to another.
         </p>
       </div>
 
@@ -88,11 +88,11 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
       </div>
 
       {/* Direction toggle + Hard Mode - centered below cards */}
-      <div className="flex items-center justify-center gap-3 mt-6">
+      <div className="flex items-center justify-center gap-3 mt-6 w-full max-w-md">
         <button
           onClick={onToggleReversed}
           title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
-          className="flex items-center justify-center gap-3 px-5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
+          className="flex items-center justify-center gap-3 w-44 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
         >
           {reversed ? (
             <>
@@ -131,7 +131,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
         <button
           onClick={onToggleHardMode}
           title="Hard Mode: country-related articles are blocked (Classic & Free Play only)"
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+          className={`flex items-center justify-center gap-2 w-24 py-2 rounded-xl border transition-all ${
             hardMode
               ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 shadow-sm'
               : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500 hover:shadow-md'
