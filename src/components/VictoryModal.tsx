@@ -1,6 +1,6 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { ShareCard, generateShareText } from './ShareCard';
+import { generateShareText } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndSave, shareText } from '../services/shareService';
@@ -9,7 +9,6 @@ import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
   const { status, steps, path, mode, targetArticle, dailyDate, reset } = useGameStore();
-  const shareCardRef = useRef<HTMLDivElement>(null);
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
   const [playerName, setPlayerName] = useState('');
@@ -51,10 +50,10 @@ export function VictoryModal() {
   };
 
   const handleSaveImage = async () => {
-    if (!shareCardRef.current) return;
     setSaving(true);
     try {
-      await captureAndSave(shareCardRef.current);
+      const pathTitles = path.map((e) => e.displayTitle);
+      await captureAndSave(steps, mode, pathTitles, targetArticle?.displayTitle || '', dailyDate);
     } finally {
       setSaving(false);
     }
@@ -173,17 +172,6 @@ export function VictoryModal() {
             </svg>
             {shared ? 'Shared!' : 'Share Puzzle'}
           </button>
-        </div>
-
-        {/* Hidden share card for screenshot capture */}
-        <div style={{ position: 'fixed', left: '-9999px', top: '0' }}>
-          <ShareCard
-            ref={shareCardRef}
-            path={path}
-            steps={steps}
-            mode={mode}
-            targetTitle={targetArticle?.displayTitle || ''}
-          />
         </div>
 
         {/* Play again */}

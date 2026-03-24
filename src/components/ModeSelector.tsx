@@ -15,7 +15,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
           WikiPath
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-3 text-lg max-w-md mx-auto">
-          Click Wikipedia links to navigate between articles.
+          Use Wikipedia links to navigate from one random topic to another.
         </p>
       </div>
 
@@ -36,7 +36,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                 {reversed
-                  ? <>Find your way from <strong>Adolf Hitler</strong> → random end in as few clicks as possible.</>
+                  ? <><strong>Adolf Hitler</strong> → find your way to random end in as few clicks as possible.</>
                   : <>Random start → find your way to <strong>Adolf Hitler</strong> in as few clicks as possible.</>
                 }
               </p>
@@ -83,50 +83,46 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
             </div>
           </div>
         </button>
-
-        {/* Direction toggle - below Free Play */}
-        <button
-          onClick={onToggleReversed}
-          title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
-          className="flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
-        >
-          {reversed ? (
-            <>
-              <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                From Hitler
-              </span>
-              <div className="flex items-center gap-1">
-                <svg
-                  className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 rotate-180 transition-transform"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
-                <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
-                <svg
-                  className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-transform"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                </svg>
-              </div>
-              <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                To Hitler
-              </span>
-            </>
-          )}
-        </button>
       </div>
+
+      {/* Direction toggle - centered below cards */}
+      <button
+        onClick={onToggleReversed}
+        title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
+        className="flex items-center justify-center gap-3 mt-6 px-5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
+      >
+        {reversed ? (
+          <>
+            <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+              From Hitler
+            </span>
+            <svg
+              className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 rotate-180 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
+          </>
+        ) : (
+          <>
+            <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
+            <svg
+              className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+              To Hitler
+            </span>
+          </>
+        )}
+      </button>
 
       {/* Footer */}
       <p className="text-xs text-gray-400 dark:text-gray-600 mt-12">

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ModeSelector } from '../components/ModeSelector';
 import { ArticleSearch } from '../components/ArticleSearch';
 import { DailyDistribution } from '../components/DailyDistribution';
 import { DailyLeaderboard } from '../components/DailyLeaderboard';
-import { ShareCard, generateShareText } from '../components/ShareCard';
+import { generateShareText } from '../components/ShareCard';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_TARGET } from '../utils/constants';
 import { hasCompletedDaily, getPlayerResult, fetchDailyDistribution } from '../services/firebase';
@@ -27,7 +27,6 @@ export function HomePage() {
     leaderboard: LeaderboardEntry[];
   } | null>(null);
 
-  const shareCardRef = useRef<HTMLDivElement>(null);
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -68,10 +67,10 @@ export function HomePage() {
   };
 
   const handleSaveImage = async () => {
-    if (!shareCardRef.current) return;
+    if (!dailyResult) return;
     setSaving(true);
     try {
-      await captureAndSave(shareCardRef.current);
+      await captureAndSave(dailyResult.steps, 'daily', [], '', dailyViewDate);
     } finally {
       setSaving(false);
     }
@@ -270,18 +269,6 @@ export function HomePage() {
             </button>
           </div>
 
-          {/* Hidden share card for screenshot capture */}
-          {dailyResult && (
-            <div style={{ position: 'fixed', left: '-9999px', top: '0' }}>
-              <ShareCard
-                ref={shareCardRef}
-                path={[]}
-                steps={dailyResult.steps}
-                mode="daily"
-                targetTitle=""
-              />
-            </div>
-          )}
         </div>
       </div>
     );
