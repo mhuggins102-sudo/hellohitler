@@ -6,46 +6,49 @@ import { DailyLeaderboard } from '../components/DailyLeaderboard';
 import { ShareCard, generateShareText } from '../components/ShareCard';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_TARGET } from '../utils/constants';
-import { hasCompletedToday, getPlayerTodayResult, fetchDailyDistribution } from '../services/firebase';
-import { captureAndShare, copyToClipboard } from '../services/shareService';
+import { hasCompletedDaily, getPlayerResult, fetchDailyDistribution } from '../services/firebase';
+import { captureAndSave, shareText } from '../services/shareService';
+import { getTodayString, getPuzzleNumberForDate } from '../utils/seededRandom';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function HomePage() {
   const { startClassicGame, startFreePlayGame, startDailyGame, loading, error } = useGameStore();
   const [showFreePlay, setShowFreePlay] = useState(false);
   const [showDailyCompleted, setShowDailyCompleted] = useState(false);
+  const [showDailyHistory, setShowDailyHistory] = useState(false);
   const [freePlayStart, setFreePlayStart] = useState('');
   const [freePlayTarget, setFreePlayTarget] = useState(DEFAULT_TARGET);
-  // false = normal (start -> Hitler), true = reversed (Hitler -> target)
   const [reversed, setReversed] = useState(false);
   const [dailyResult, setDailyResult] = useState<{ name: string; steps: number } | null>(null);
+  const [dailyViewDate, setDailyViewDate] = useState(getTodayString());
   const [dailyStats, setDailyStats] = useState<{
     distribution: Record<number, number>;
     totalPlayers: number;
     leaderboard: LeaderboardEntry[];
   } | null>(null);
 
-  // Share state for daily completed page
   const shareCardRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Poll daily stats when viewing completed state
   useEffect(() => {
     if (!showDailyCompleted) return;
     const load = async () => {
-      const stats = await fetchDailyDistribution();
+      const stats = await fetchDailyDistribution(dailyViewDate);
       setDailyStats(stats);
     };
     load();
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-  }, [showDailyCompleted]);
+  }, [showDailyCompleted, dailyViewDate]);
 
   const handleDailyClick = () => {
-    if (hasCompletedToday()) {
-      const result = getPlayerTodayResult();
+    const today = getTodayString();
+    if (hasCompletedDaily(today)) {
+      const result = getPlayerResult(today);
       setDailyResult(result);
+      setDailyViewDate(today);
       setShowDailyCompleted(true);
     } else {
       startDailyGame();
@@ -58,39 +61,57 @@ export function HomePage() {
 
   const handleSwapDirection = () => {
     setReversed((prev) => !prev);
-    // Swap the current values
     const oldStart = freePlayStart;
     const oldTarget = freePlayTarget;
     setFreePlayStart(oldTarget);
     setFreePlayTarget(oldStart);
   };
 
-  const handleScreenshot = async () => {
+  const handleSaveImage = async () => {
     if (!shareCardRef.current) return;
-    setSharing(true);
+    setSaving(true);
     try {
-      await captureAndShare(shareCardRef.current);
+      await captureAndSave(shareCardRef.current);
     } finally {
-      setSharing(false);
+      setSaving(false);
     }
   };
 
-  const handleCopyText = async () => {
+  const handleSharePuzzle = async () => {
     if (!dailyResult) return;
-    const text = generateShareText(dailyResult.steps, 'daily');
-    const success = await copyToClipboard(text);
+    const text = generateShareText(dailyResult.steps, 'daily', dailyViewDate);
+    const success = await shareText(text);
     if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
     }
   };
 
-  if (showDailyCompleted) {
+  // Generate past puzzle dates (last 30 days)
+  const getPastPuzzles = () => {
+    const puzzles: Array<{ date: string; puzzleNumber: number; completed: boolean }> = [];
+    const today = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      puzzles.push({
+        date: dateStr,
+        puzzleNumber: getPuzzleNumberForDate(dateStr),
+        completed: hasCompletedDaily(dateStr),
+      });
+    }
+    return puzzles;
+  };
+
+  // ---- Daily History View ----
+  if (showDailyHistory) {
+    const puzzles = getPastPuzzles();
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
         <div className="w-full max-w-md">
           <button
-            onClick={() => setShowDailyCompleted(false)}
+            onClick={() => setShowDailyHistory(false)}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 mb-6 flex items-center gap-1 text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,21 +120,117 @@ export function HomePage() {
             Back
           </button>
 
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+            Daily Puzzle History
+          </h2>
+
+          <div className="space-y-2">
+            {puzzles.map(({ date, puzzleNumber, completed }) => {
+              const isToday = date === getTodayString();
+              const result = completed ? getPlayerResult(date) : null;
+
+              return (
+                <button
+                  key={date}
+                  onClick={() => {
+                    if (completed) {
+                      const r = getPlayerResult(date);
+                      setDailyResult(r);
+                      setDailyViewDate(date);
+                      setShowDailyHistory(false);
+                      setShowDailyCompleted(true);
+                    } else {
+                      startDailyGame(date);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
+                    completed
+                      ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800 hover:border-green-400'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-md'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                        Daily #{puzzleNumber}
+                      </span>
+                      {isToday && (
+                        <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                          Today
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{date}</span>
+                  </div>
+                  <div>
+                    {completed ? (
+                      <div className="flex items-center gap-2">
+                        {result && (
+                          <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                            {result.steps} {result.steps === 1 ? 'step' : 'steps'}
+                          </span>
+                        )}
+                        <span className="text-green-500">✓</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Play</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Daily Completed View ----
+  if (showDailyCompleted) {
+    const puzzleNum = getPuzzleNumberForDate(dailyViewDate);
+    const isToday = dailyViewDate === getTodayString();
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => setShowDailyCompleted(false)}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+            <button
+              onClick={() => {
+                setShowDailyCompleted(false);
+                setShowDailyHistory(true);
+              }}
+              className="text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-medium"
+            >
+              Puzzle History
+            </button>
+          </div>
+
           <div className="text-center mb-6">
             <div className="text-4xl mb-2">✅</div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              Already Completed!
+              {isToday ? 'Already Completed!' : `Daily #${puzzleNum}`}
             </h2>
             {dailyResult && (
               <p className="text-gray-600 dark:text-gray-400 mt-2">
-                <span className="font-semibold">{dailyResult.name}</span>, you finished today's puzzle in{' '}
+                <span className="font-semibold">{dailyResult.name}</span>, you finished {isToday ? "today's" : 'this'} puzzle in{' '}
                 <span className="font-bold text-blue-600 dark:text-blue-400">{dailyResult.steps}</span>{' '}
                 {dailyResult.steps === 1 ? 'step' : 'steps'}.
               </p>
             )}
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-              Come back tomorrow for a new puzzle!
-            </p>
+            {isToday && (
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                Come back tomorrow for a new puzzle!
+              </p>
+            )}
           </div>
 
           {dailyStats && dailyStats.totalPlayers > 0 && (
@@ -133,30 +250,29 @@ export function HomePage() {
           {/* Share buttons */}
           <div className="flex gap-3 mt-6">
             <button
-              onClick={handleScreenshot}
-              disabled={sharing}
+              onClick={handleSaveImage}
+              disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              {sharing ? 'Capturing...' : 'Share Image'}
+              {saving ? 'Saving...' : 'Save Image'}
             </button>
             <button
-              onClick={handleCopyText}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              onClick={handleSharePuzzle}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              {copied ? 'Copied!' : 'Copy Result'}
+              {shared ? 'Shared!' : 'Share Puzzle'}
             </button>
           </div>
 
           {/* Hidden share card for screenshot capture */}
           {dailyResult && (
-            <div className="fixed -left-[9999px] top-0">
+            <div style={{ position: 'fixed', left: '-9999px', top: '0' }}>
               <ShareCard
                 ref={shareCardRef}
                 path={[]}
@@ -171,6 +287,7 @@ export function HomePage() {
     );
   }
 
+  // ---- Free Play Setup ----
   if (showFreePlay) {
     const startLabel = reversed ? 'Start Article (default: Adolf Hitler)' : 'Start Article';
     const targetLabel = reversed ? 'Target Article' : 'Target Article (default: Adolf Hitler)';
@@ -193,7 +310,6 @@ export function HomePage() {
               Free Play Setup
             </h2>
 
-            {/* Reverse direction button */}
             <button
               onClick={handleSwapDirection}
               title={reversed ? 'Direction: Hitler → Your choice' : 'Direction: Your choice → Hitler'}
@@ -248,6 +364,7 @@ export function HomePage() {
     );
   }
 
+  // ---- Home Screen ----
   return (
     <>
       {error && (
@@ -264,7 +381,6 @@ export function HomePage() {
         <ModeSelector
           onSelectClassic={() => startClassicGame(reversed)}
           onSelectFreePlay={() => {
-            // Set Free Play defaults based on current home screen direction
             if (reversed) {
               setFreePlayStart(DEFAULT_TARGET);
               setFreePlayTarget('');

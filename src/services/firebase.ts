@@ -2,23 +2,13 @@
  * Firebase service for daily puzzle stats.
  *
  * Falls back to localStorage when Firebase is not configured.
- * To enable Firebase:
- * 1. Create a Firebase project at console.firebase.google.com
- * 2. Enable Firestore
- * 3. Create a .env file with your Firebase config:
- *    VITE_FIREBASE_API_KEY=...
- *    VITE_FIREBASE_AUTH_DOMAIN=...
- *    VITE_FIREBASE_PROJECT_ID=...
- *    VITE_FIREBASE_STORAGE_BUCKET=...
- *    VITE_FIREBASE_MESSAGING_SENDER_ID=...
- *    VITE_FIREBASE_APP_ID=...
  */
 
 import { getTodayString } from '../utils/seededRandom';
 
 const STORAGE_KEY = 'wikipath-daily-results';
 const SUBMITTED_KEY = 'wikipath-daily-submitted';
-const COMPLETED_KEY = 'wikipath-daily-completed';
+const COMPLETED_KEY_PREFIX = 'wikipath-daily-completed-';
 
 export interface LeaderboardEntry {
   name: string;
@@ -54,7 +44,6 @@ function ensureDateEntry(results: DailyResults, date: string): DailyData {
   if (!results[date]) {
     results[date] = { entries: [], leaderboard: [], submittedByPlayer: false };
   }
-  // Migration: ensure leaderboard array exists for old data
   if (!results[date].leaderboard) {
     results[date].leaderboard = [];
   }
@@ -62,36 +51,48 @@ function ensureDateEntry(results: DailyResults, date: string): DailyData {
 }
 
 /**
- * Check if the player already completed today's daily puzzle.
+ * Check if the player already completed a daily puzzle for a given date.
  */
+export function hasCompletedDaily(dateStr?: string): boolean {
+  const date = dateStr || getTodayString();
+  const completed = localStorage.getItem(COMPLETED_KEY_PREFIX + date);
+  return completed === 'true';
+}
+
+/** Alias for backwards compat */
 export function hasCompletedToday(): boolean {
-  const completed = localStorage.getItem(COMPLETED_KEY);
-  return completed === getTodayString();
+  return hasCompletedDaily(getTodayString());
 }
 
 /**
- * Mark today's daily puzzle as completed (prevents replay).
+ * Mark a daily puzzle as completed (prevents replay).
  */
-export function markDailyCompleted(): void {
-  localStorage.setItem(COMPLETED_KEY, getTodayString());
+export function markDailyCompleted(dateStr?: string): void {
+  const date = dateStr || getTodayString();
+  localStorage.setItem(COMPLETED_KEY_PREFIX + date, 'true');
 }
 
 /**
- * Check if the player already submitted a result today.
+ * Check if the player already submitted a result for a given date.
  */
-export function hasSubmittedToday(): boolean {
+export function hasSubmittedDaily(dateStr?: string): boolean {
+  const date = dateStr || getTodayString();
   const submitted = localStorage.getItem(SUBMITTED_KEY);
-  return submitted === getTodayString();
+  return submitted === date;
+}
+
+/** Alias for backwards compat */
+export function hasSubmittedToday(): boolean {
+  return hasSubmittedDaily(getTodayString());
 }
 
 /**
  * Submit a daily puzzle result with the player's name.
  */
-export async function submitDailyResult(steps: number, playerName: string): Promise<void> {
-  const date = getTodayString();
+export async function submitDailyResult(steps: number, playerName: string, dateStr?: string): Promise<void> {
+  const date = dateStr || getTodayString();
 
-  // Prevent duplicate submissions
-  if (hasSubmittedToday()) return;
+  if (hasSubmittedDaily(date)) return;
 
   const results = getStoredResults();
   const data = ensureDateEntry(results, date);
@@ -101,14 +102,12 @@ export async function submitDailyResult(steps: number, playerName: string): Prom
   data.playerName = playerName;
   data.playerSteps = steps;
 
-  // Add to leaderboard
   data.leaderboard.push({
     name: playerName,
     steps,
     timestamp: Date.now(),
   });
 
-  // Sort leaderboard by steps (ascending), then by timestamp (earlier is better)
   data.leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
 
   saveResults(results);
@@ -116,14 +115,14 @@ export async function submitDailyResult(steps: number, playerName: string): Prom
 }
 
 /**
- * Fetch the distribution and leaderboard for today's puzzle.
+ * Fetch the distribution and leaderboard for a given date's puzzle.
  */
-export async function fetchDailyDistribution(): Promise<{
+export async function fetchDailyDistribution(dateStr?: string): Promise<{
   distribution: Record<number, number>;
   totalPlayers: number;
   leaderboard: LeaderboardEntry[];
 }> {
-  const date = getTodayString();
+  const date = dateStr || getTodayString();
   const results = getStoredResults();
   const data = results[date];
   const entries = data?.entries || [];
@@ -142,14 +141,36 @@ export async function fetchDailyDistribution(): Promise<{
 }
 
 /**
- * Get the player's saved result for today (if any).
+ * Get the player's saved result for a given date (if any).
  */
-export function getPlayerTodayResult(): { name: string; steps: number } | null {
-  const date = getTodayString();
+export function getPlayerResult(dateStr?: string): { name: string; steps: number } | null {
+  const date = dateStr || getTodayString();
   const results = getStoredResults();
   const data = results[date];
   if (data?.submittedByPlayer && data.playerName && data.playerSteps !== undefined) {
     return { name: data.playerName, steps: data.playerSteps };
   }
   return null;
+}
+
+/** Alias for backwards compat */
+export function getPlayerTodayResult(): { name: string; steps: number } | null {
+  return getPlayerResult(getTodayString());
+}
+
+/**
+ * Get all dates that have been completed.
+ */
+export function getCompletedDates(): string[] {
+  const dates: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(COMPLETED_KEY_PREFIX)) {
+      const date = key.slice(COMPLETED_KEY_PREFIX.length);
+      if (localStorage.getItem(key) === 'true') {
+        dates.push(date);
+      }
+    }
+  }
+  return dates.sort().reverse();
 }

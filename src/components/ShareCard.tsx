@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import type { PathEntry } from '../types/game';
 import type { GameMode } from '../types/game';
-import { getDailyPuzzleNumber } from '../utils/seededRandom';
+import { getDailyPuzzleNumber, getPuzzleNumberForDate, getTodayString } from '../utils/seededRandom';
 
 interface ShareCardProps {
   path: PathEntry[];
@@ -83,10 +83,12 @@ export function getAppUrl(): string {
 }
 
 /**
- * Generate Wordle-style spoiler-free share text
+ * Generate Wordle-style spoiler-free share text.
+ * For daily puzzles, includes a link to that specific puzzle date.
  */
-export function generateShareText(steps: number, mode: GameMode): string {
-  const puzzleNumber = getDailyPuzzleNumber();
+export function generateShareText(steps: number, mode: GameMode, dailyDate?: string | null): string {
+  const dateStr = dailyDate || getTodayString();
+  const puzzleNumber = mode === 'daily' ? getPuzzleNumberForDate(dateStr) : getDailyPuzzleNumber();
   const squares = '⬜'.repeat(Math.max(0, steps - 1)) + '🎯';
   const appUrl = getAppUrl();
 
@@ -103,7 +105,10 @@ export function generateShareText(steps: number, mode: GameMode): string {
   ];
 
   if (appUrl) {
-    lines.push('', appUrl);
+    const url = mode === 'daily'
+      ? `${appUrl}?daily=${dateStr}`
+      : appUrl;
+    lines.push('', url);
   }
 
   return lines.join('\n');

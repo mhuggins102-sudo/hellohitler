@@ -3,7 +3,7 @@ import type { GameMode, GameStatus, Article, ArticleContent, PathEntry } from '.
 import { fetchArticle, fetchRandomArticle } from '../services/wikipediaApi';
 import { DEFAULT_TARGET, DEFAULT_TARGET_DISPLAY } from '../utils/constants';
 import { getDailyPuzzle } from '../services/dailyPuzzle';
-import { hasCompletedToday, markDailyCompleted } from '../services/firebase';
+import { hasCompletedDaily, markDailyCompleted } from '../services/firebase';
 
 interface GameStore {
   mode: GameMode;
@@ -22,7 +22,8 @@ interface GameStore {
   // Actions
   startClassicGame: (reversed?: boolean) => Promise<void>;
   startFreePlayGame: (startTitle: string, targetTitle: string) => Promise<void>;
-  startDailyGame: () => Promise<void>;
+  startDailyGame: (dateStr?: string) => Promise<void>;
+  dailyDate: string | null;
   navigateTo: (title: string) => Promise<void>;
   goBack: () => void;
   reset: () => void;
@@ -39,6 +40,7 @@ const initialState = {
   loading: false,
   error: null as string | null,
   articleCache: new Map<string, ArticleContent>(),
+  dailyDate: null as string | null,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -142,17 +144,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  startDailyGame: async () => {
-    // Prevent replay if already completed today
-    if (hasCompletedToday()) {
-      set({ error: 'You already completed today\'s daily puzzle! Come back tomorrow for a new one.' });
+  startDailyGame: async (dateStr?: string) => {
+    // Prevent replay if already completed
+    if (hasCompletedDaily(dateStr)) {
+      set({ error: 'You already completed this daily puzzle!' });
       return;
     }
 
-    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map() });
+    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null });
 
     try {
-      const puzzle = getDailyPuzzle();
+      const puzzle = getDailyPuzzle(dateStr);
       const article = await fetchArticle(puzzle.startArticle);
       if (!article) throw new Error('Failed to fetch daily start article');
 
@@ -221,7 +223,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       // Mark daily puzzle as completed on win
       if (won && get().mode === 'daily') {
-        markDailyCompleted();
+        markDailyCompleted(get().dailyDate || undefined);
       }
 
       set({

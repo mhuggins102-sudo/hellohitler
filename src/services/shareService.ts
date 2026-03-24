@@ -1,87 +1,73 @@
 import html2canvas from 'html2canvas';
 
 /**
- * Captures a DOM element as a PNG image and shares via native share sheet,
- * or falls back to download on desktop.
+ * Captures a DOM element as a PNG and opens the native share sheet to save/share.
+ * On iOS this allows saving to Photos or Files.
+ * Falls back to direct download on desktop.
  */
-export async function captureAndShare(element: HTMLElement): Promise<void> {
-  const canvas = await html2canvas(element, {
-    backgroundColor: null,
-    scale: 2,
-    logging: false,
-    useCORS: true,
-  });
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/png')
-  );
-
-  if (!blob) return;
-
-  const file = new File([blob], 'wikipath-result.png', { type: 'image/png' });
-
-  // Try native share API first (iOS/Android share sheet)
-  if (navigator.share) {
-    try {
-      // Try sharing with file first
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'WikiPath Result',
-        });
-        return;
-      }
-    } catch {
-      // User cancelled or share failed, fall through
-    }
-
-    // Try text-only share as fallback
-    try {
-      await navigator.share({
-        title: 'WikiPath Result',
-        text: 'Check out my WikiPath result!',
-      });
-      return;
-    } catch {
-      // Fall through to download
-    }
+export async function captureAndSave(element: HTMLElement): Promise<void> {
+  // Temporarily make element visible for html2canvas capture
+  const originalStyle = element.parentElement?.style.cssText || '';
+  if (element.parentElement) {
+    element.parentElement.style.cssText = 'position:fixed;top:0;left:0;z-index:-1;opacity:0;pointer-events:none;';
   }
 
-  // Fallback: trigger download (works on desktop and as last resort on mobile)
-  downloadBlob(blob, 'wikipath-result.png');
+  try {
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#4338ca',
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+    });
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/png')
+    );
+
+    if (!blob) return;
+
+    const file = new File([blob], 'wikipath-result.png', { type: 'image/png' });
+
+    // Try native share API (opens iOS share sheet with Save Image option)
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file] });
+        return;
+      } catch {
+        // User cancelled or failed, fall through to download
+      }
+    }
+
+    // Fallback: download
+    downloadBlob(blob, 'wikipath-result.png');
+  } finally {
+    // Restore original positioning
+    if (element.parentElement) {
+      element.parentElement.style.cssText = originalStyle;
+    }
+  }
 }
 
 /**
- * Captures a DOM element and immediately triggers a save/download.
- * On iOS this will prompt to save to Files or share.
+ * Shares text via native share sheet (opens Messages, WhatsApp, etc. on mobile).
+ * Falls back to clipboard copy on desktop.
  */
-export async function captureAndSave(element: HTMLElement): Promise<void> {
-  const canvas = await html2canvas(element, {
-    backgroundColor: null,
-    scale: 2,
-    logging: false,
-    useCORS: true,
-  });
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/png')
-  );
-
-  if (!blob) return;
-
-  const file = new File([blob], 'wikipath-result.png', { type: 'image/png' });
-
-  // On mobile, try share sheet so user can save to Photos/Files
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+export async function shareText(text: string): Promise<boolean> {
+  // Try native share API first (opens share sheet on mobile)
+  if (navigator.share) {
     try {
-      await navigator.share({ files: [file] });
-      return;
+      await navigator.share({ text });
+      return true;
     } catch {
-      // Fall through to download
+      // User cancelled - still count as handled
+      return true;
     }
   }
 
-  downloadBlob(blob, 'wikipath-result.png');
+  // Fallback: copy to clipboard
+  return copyToClipboard(text);
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -103,7 +89,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    // Fallback for older browsers
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
