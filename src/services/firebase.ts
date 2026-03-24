@@ -19,6 +19,17 @@ const COMPLETED_KEY_PREFIX = 'wikipath-daily-completed-';
 const SUBMITTED_KEY_PREFIX = 'wikipath-daily-submitted-';
 const PLAYER_RESULT_PREFIX = 'wikipath-daily-player-';
 const PUZZLE_SUBMITTED_PREFIX = 'wikipath-puzzle-submitted-';
+const USERNAME_KEY = 'wikipath-username';
+
+// --- Username persistence ---
+
+export function getStoredUsername(): string | null {
+  return localStorage.getItem(USERNAME_KEY);
+}
+
+export function setStoredUsername(name: string): void {
+  localStorage.setItem(USERNAME_KEY, name);
+}
 
 // --- Firebase initialization ---
 
@@ -243,6 +254,12 @@ export async function submitPuzzleResult(
   }
 
   localStorage.setItem(PUZZLE_SUBMITTED_PREFIX + puzzleId, 'true');
+
+  // Save player result locally for fallback
+  localStorage.setItem(
+    'wikipath-puzzle-player-' + puzzleId,
+    JSON.stringify({ name: playerName, steps, path: pathTitles || [] }),
+  );
 }
 
 export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
@@ -252,6 +269,18 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
 }> {
   const firestore = getDb();
   if (!firestore) {
+    // Fallback to localStorage
+    try {
+      const stored = localStorage.getItem('wikipath-puzzle-player-' + puzzleId);
+      if (stored) {
+        const result = JSON.parse(stored);
+        return {
+          distribution: { [result.steps]: 1 },
+          totalPlayers: 1,
+          leaderboard: [{ name: result.name, steps: result.steps, timestamp: 0 }],
+        };
+      }
+    } catch { /* ignore */ }
     return { distribution: {}, totalPlayers: 0, leaderboard: [] };
   }
 

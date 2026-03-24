@@ -87,6 +87,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           status: 'playing',
           loading: false,
           articleCache: cache,
+          puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
         });
       } else {
         // Normal: random start, navigate to Hitler
@@ -110,6 +111,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           status: 'playing',
           loading: false,
           articleCache: cache,
+          puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
         });
       }
     } catch (err) {

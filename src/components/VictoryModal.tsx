@@ -4,14 +4,14 @@ import { generateShareText } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndSave, shareText } from '../services/shareService';
-import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily, submitPuzzleResult, fetchPuzzleDistribution, hasSubmittedPuzzle } from '../services/firebase';
+import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily, submitPuzzleResult, fetchPuzzleDistribution, hasSubmittedPuzzle, getStoredUsername, setStoredUsername } from '../services/firebase';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
   const { status, steps, path, mode, startArticle, targetArticle, dailyDate, puzzleId, reset } = useGameStore();
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(() => getStoredUsername() || '');
   const [nameSubmitted, setNameSubmitted] = useState(false);
   const [dailyStats, setDailyStats] = useState<{
     distribution: Record<number, number>;
@@ -21,20 +21,43 @@ export function VictoryModal() {
 
   const showLeaderboard = mode === 'daily' || !!puzzleId;
 
-  // Check if already submitted on mount
+  // Check if already submitted, or auto-submit if username is stored
   useEffect(() => {
     if (status !== 'won') return;
-    if (mode === 'daily') {
-      if (hasSubmittedDaily(dailyDate || undefined)) {
-        setNameSubmitted(true);
-        fetchDailyDistribution(dailyDate || undefined).then(setDailyStats);
+
+    const autoSubmitAndFetch = async () => {
+      if (mode === 'daily') {
+        if (hasSubmittedDaily(dailyDate || undefined)) {
+          setNameSubmitted(true);
+          fetchDailyDistribution(dailyDate || undefined).then(setDailyStats);
+          return;
+        }
+      } else if (puzzleId) {
+        if (hasSubmittedPuzzle(puzzleId)) {
+          setNameSubmitted(true);
+          fetchPuzzleDistribution(puzzleId).then(setDailyStats);
+          return;
+        }
       }
-    } else if (puzzleId) {
-      if (hasSubmittedPuzzle(puzzleId)) {
+
+      // Auto-submit if we have a stored username
+      const storedName = getStoredUsername();
+      if (storedName && showLeaderboard) {
+        const pathTitles = path.map((e) => e.displayTitle);
+        if (mode === 'daily') {
+          await submitDailyResult(steps, storedName, dailyDate || undefined, pathTitles);
+          const stats = await fetchDailyDistribution(dailyDate || undefined);
+          setDailyStats(stats);
+        } else if (puzzleId) {
+          await submitPuzzleResult(puzzleId, steps, storedName, pathTitles);
+          const stats = await fetchPuzzleDistribution(puzzleId);
+          setDailyStats(stats);
+        }
         setNameSubmitted(true);
-        fetchPuzzleDistribution(puzzleId).then(setDailyStats);
       }
-    }
+    };
+
+    autoSubmitAndFetch();
   }, [status, mode, dailyDate, puzzleId]);
 
   // Poll for updated stats every 30 seconds after submission
@@ -54,6 +77,7 @@ export function VictoryModal() {
   const handleNameSubmit = async () => {
     const trimmed = playerName.trim();
     if (!trimmed) return;
+    setStoredUsername(trimmed);
     const pathTitles = path.map((e) => e.displayTitle);
     if (mode === 'daily') {
       await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles);
