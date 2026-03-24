@@ -150,6 +150,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: 'playing',
         loading: false,
         articleCache: cache,
+        puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
@@ -185,6 +186,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: 'playing',
         loading: false,
         articleCache: cache,
+        puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
