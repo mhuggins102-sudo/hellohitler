@@ -2,32 +2,54 @@ import { useRef, useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ShareCard, generateShareText } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
+import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndShare, copyToClipboard } from '../services/shareService';
-import { submitDailyResult, fetchDailyDistribution } from '../services/firebase';
+import { submitDailyResult, fetchDailyDistribution, hasSubmittedToday } from '../services/firebase';
+import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
   const { status, steps, path, mode, targetArticle, reset } = useGameStore();
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [nameSubmitted, setNameSubmitted] = useState(false);
   const [dailyStats, setDailyStats] = useState<{
     distribution: Record<number, number>;
     totalPlayers: number;
+    leaderboard: LeaderboardEntry[];
   } | null>(null);
 
-  // Submit daily result and fetch distribution
+  // Check if already submitted on mount
   useEffect(() => {
     if (status !== 'won' || mode !== 'daily') return;
+    if (hasSubmittedToday()) {
+      setNameSubmitted(true);
+      // Fetch existing stats
+      fetchDailyDistribution().then(setDailyStats);
+    }
+  }, [status, mode]);
 
-    const run = async () => {
-      await submitDailyResult(steps);
+  // Poll for updated stats every 30 seconds after submission
+  useEffect(() => {
+    if (!nameSubmitted || mode !== 'daily') return;
+    const interval = setInterval(async () => {
       const stats = await fetchDailyDistribution();
       setDailyStats(stats);
-    };
-    run();
-  }, [status, mode, steps]);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [nameSubmitted, mode]);
 
   if (status !== 'won') return null;
+
+  const handleNameSubmit = async () => {
+    const trimmed = playerName.trim();
+    if (!trimmed) return;
+    await submitDailyResult(steps, trimmed);
+    const stats = await fetchDailyDistribution();
+    setDailyStats(stats);
+    setNameSubmitted(true);
+  };
 
   const handleScreenshot = async () => {
     if (!shareCardRef.current) return;
@@ -88,13 +110,46 @@ export function VictoryModal() {
           </div>
         </div>
 
-        {/* Daily distribution */}
+        {/* Daily mode: name entry + leaderboard */}
+        {mode === 'daily' && !nameSubmitted && (
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-4">
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+              Record Your Score
+            </h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
+                placeholder="Enter your name..."
+                maxLength={30}
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
+              <button
+                onClick={handleNameSubmit}
+                disabled={!playerName.trim()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Daily distribution + leaderboard */}
         {mode === 'daily' && dailyStats && dailyStats.totalPlayers > 0 && (
-          <DailyDistribution
-            distribution={dailyStats.distribution}
-            playerSteps={steps}
-            totalPlayers={dailyStats.totalPlayers}
-          />
+          <>
+            <DailyDistribution
+              distribution={dailyStats.distribution}
+              playerSteps={steps}
+              totalPlayers={dailyStats.totalPlayers}
+            />
+            <DailyLeaderboard
+              leaderboard={dailyStats.leaderboard}
+              playerSteps={steps}
+            />
+          </>
         )}
 
         {/* Share buttons */}

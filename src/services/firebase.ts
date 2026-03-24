@@ -18,12 +18,24 @@ import { getTodayString } from '../utils/seededRandom';
 
 const STORAGE_KEY = 'wikipath-daily-results';
 const SUBMITTED_KEY = 'wikipath-daily-submitted';
+const COMPLETED_KEY = 'wikipath-daily-completed';
+
+export interface LeaderboardEntry {
+  name: string;
+  steps: number;
+  timestamp: number;
+}
+
+interface DailyData {
+  entries: number[];
+  leaderboard: LeaderboardEntry[];
+  submittedByPlayer: boolean;
+  playerName?: string;
+  playerSteps?: number;
+}
 
 interface DailyResults {
-  [date: string]: {
-    entries: number[];
-    submittedByPlayer: boolean;
-  };
+  [date: string]: DailyData;
 }
 
 function getStoredResults(): DailyResults {
@@ -38,6 +50,32 @@ function saveResults(results: DailyResults): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
 }
 
+function ensureDateEntry(results: DailyResults, date: string): DailyData {
+  if (!results[date]) {
+    results[date] = { entries: [], leaderboard: [], submittedByPlayer: false };
+  }
+  // Migration: ensure leaderboard array exists for old data
+  if (!results[date].leaderboard) {
+    results[date].leaderboard = [];
+  }
+  return results[date];
+}
+
+/**
+ * Check if the player already completed today's daily puzzle.
+ */
+export function hasCompletedToday(): boolean {
+  const completed = localStorage.getItem(COMPLETED_KEY);
+  return completed === getTodayString();
+}
+
+/**
+ * Mark today's daily puzzle as completed (prevents replay).
+ */
+export function markDailyCompleted(): void {
+  localStorage.setItem(COMPLETED_KEY, getTodayString());
+}
+
 /**
  * Check if the player already submitted a result today.
  */
@@ -47,37 +85,49 @@ export function hasSubmittedToday(): boolean {
 }
 
 /**
- * Submit a daily puzzle result.
+ * Submit a daily puzzle result with the player's name.
  */
-export async function submitDailyResult(steps: number): Promise<void> {
+export async function submitDailyResult(steps: number, playerName: string): Promise<void> {
   const date = getTodayString();
 
   // Prevent duplicate submissions
   if (hasSubmittedToday()) return;
 
   const results = getStoredResults();
-  if (!results[date]) {
-    results[date] = { entries: [], submittedByPlayer: false };
-  }
+  const data = ensureDateEntry(results, date);
 
-  results[date].entries.push(steps);
-  results[date].submittedByPlayer = true;
+  data.entries.push(steps);
+  data.submittedByPlayer = true;
+  data.playerName = playerName;
+  data.playerSteps = steps;
+
+  // Add to leaderboard
+  data.leaderboard.push({
+    name: playerName,
+    steps,
+    timestamp: Date.now(),
+  });
+
+  // Sort leaderboard by steps (ascending), then by timestamp (earlier is better)
+  data.leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+
   saveResults(results);
-
   localStorage.setItem(SUBMITTED_KEY, date);
 }
 
 /**
- * Fetch the distribution of results for today's puzzle.
- * Returns a map of steps -> count.
+ * Fetch the distribution and leaderboard for today's puzzle.
  */
 export async function fetchDailyDistribution(): Promise<{
   distribution: Record<number, number>;
   totalPlayers: number;
+  leaderboard: LeaderboardEntry[];
 }> {
   const date = getTodayString();
   const results = getStoredResults();
-  const entries = results[date]?.entries || [];
+  const data = results[date];
+  const entries = data?.entries || [];
+  const leaderboard = data?.leaderboard || [];
 
   const distribution: Record<number, number> = {};
   for (const steps of entries) {
@@ -87,5 +137,19 @@ export async function fetchDailyDistribution(): Promise<{
   return {
     distribution,
     totalPlayers: entries.length,
+    leaderboard,
   };
+}
+
+/**
+ * Get the player's saved result for today (if any).
+ */
+export function getPlayerTodayResult(): { name: string; steps: number } | null {
+  const date = getTodayString();
+  const results = getStoredResults();
+  const data = results[date];
+  if (data?.submittedByPlayer && data.playerName && data.playerSteps !== undefined) {
+    return { name: data.playerName, steps: data.playerSteps };
+  }
+  return null;
 }

@@ -3,6 +3,7 @@ import type { GameMode, GameStatus, Article, ArticleContent, PathEntry } from '.
 import { fetchArticle, fetchRandomArticle } from '../services/wikipediaApi';
 import { DEFAULT_TARGET, DEFAULT_TARGET_DISPLAY } from '../utils/constants';
 import { getDailyPuzzle } from '../services/dailyPuzzle';
+import { hasCompletedToday, markDailyCompleted } from '../services/firebase';
 
 interface GameStore {
   mode: GameMode;
@@ -112,6 +113,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startDailyGame: async () => {
+    // Prevent replay if already completed today
+    if (hasCompletedToday()) {
+      set({ error: 'You already completed today\'s daily puzzle! Come back tomorrow for a new one.' });
+      return;
+    }
+
     set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map() });
 
     try {
@@ -181,6 +188,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Check win condition (case-insensitive comparison)
       const won = targetArticle &&
         article.title.toLowerCase() === targetArticle.title.toLowerCase();
+
+      // Mark daily puzzle as completed on win
+      if (won && get().mode === 'daily') {
+        markDailyCompleted();
+      }
 
       set({
         currentArticle: article,
