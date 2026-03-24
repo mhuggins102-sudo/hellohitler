@@ -19,10 +19,9 @@ export function GameHeader() {
           </svg>
         </button>
         <div className="min-w-0">
-          <h1
-            className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate"
-            dangerouslySetInnerHTML={{ __html: currentArticle?.displayTitle || '' }}
-          />
+          <h1 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+            {currentArticle?.displayTitle || ''}
+          </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Target: <span className="font-medium text-amber-600 dark:text-amber-400">{targetArticle?.displayTitle}</span>
           </p>

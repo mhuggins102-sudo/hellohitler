@@ -11,6 +11,13 @@ function buildUrl(params: Record<string, string>): string {
   return url.toString();
 }
 
+/**
+ * Strip HTML tags from a string (used for displayTitle which comes with spans).
+ */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '');
+}
+
 export async function fetchArticle(title: string): Promise<{
   title: string;
   displayTitle: string;
@@ -30,7 +37,7 @@ export async function fetchArticle(title: string): Promise<{
 
   return {
     title: data.parse.title,
-    displayTitle: data.parse.displaytitle,
+    displayTitle: stripHtml(data.parse.displaytitle),
     html: data.parse.text['*'],
   };
 }

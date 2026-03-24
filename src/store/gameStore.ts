@@ -20,7 +20,7 @@ interface GameStore {
   articleCache: Map<string, ArticleContent>;
 
   // Actions
-  startClassicGame: () => Promise<void>;
+  startClassicGame: (reversed?: boolean) => Promise<void>;
   startFreePlayGame: (startTitle: string, targetTitle: string) => Promise<void>;
   startDailyGame: () => Promise<void>;
   navigateTo: (title: string) => Promise<void>;
@@ -44,34 +44,64 @@ const initialState = {
 export const useGameStore = create<GameStore>((set, get) => ({
   ...initialState,
 
-  startClassicGame: async () => {
+  startClassicGame: async (reversed = false) => {
     set({ ...initialState, mode: 'classic', loading: true, articleCache: new Map() });
 
     try {
       const random = await fetchRandomArticle();
       if (!random) throw new Error('Failed to get random article');
 
-      const article = await fetchArticle(random.title);
-      if (!article) throw new Error('Failed to fetch article');
+      if (reversed) {
+        // Reversed: start from Hitler, navigate to random target
+        const hitlerArticle = await fetchArticle(DEFAULT_TARGET);
+        if (!hitlerArticle) throw new Error('Failed to fetch start article');
 
-      const startArticle: Article = { title: article.title, displayTitle: article.displayTitle };
-      const targetArticle: Article = { title: DEFAULT_TARGET, displayTitle: DEFAULT_TARGET_DISPLAY };
-      const currentArticle: ArticleContent = article;
-      const firstEntry: PathEntry = { ...startArticle, timestamp: Date.now() };
+        // Validate random target exists
+        const targetCheck = await fetchArticle(random.title);
+        if (!targetCheck) throw new Error('Failed to fetch target article');
 
-      const cache = new Map<string, ArticleContent>();
-      cache.set(article.title, currentArticle);
+        const startArticle: Article = { title: hitlerArticle.title, displayTitle: hitlerArticle.displayTitle };
+        const targetArticle: Article = { title: targetCheck.title, displayTitle: targetCheck.displayTitle };
+        const currentArticle: ArticleContent = hitlerArticle;
+        const firstEntry: PathEntry = { ...startArticle, timestamp: Date.now() };
 
-      set({
-        startArticle,
-        targetArticle,
-        currentArticle,
-        path: [firstEntry],
-        steps: 0,
-        status: 'playing',
-        loading: false,
-        articleCache: cache,
-      });
+        const cache = new Map<string, ArticleContent>();
+        cache.set(hitlerArticle.title, currentArticle);
+
+        set({
+          startArticle,
+          targetArticle,
+          currentArticle,
+          path: [firstEntry],
+          steps: 0,
+          status: 'playing',
+          loading: false,
+          articleCache: cache,
+        });
+      } else {
+        // Normal: random start, navigate to Hitler
+        const article = await fetchArticle(random.title);
+        if (!article) throw new Error('Failed to fetch article');
+
+        const startArticle: Article = { title: article.title, displayTitle: article.displayTitle };
+        const targetArticle: Article = { title: DEFAULT_TARGET, displayTitle: DEFAULT_TARGET_DISPLAY };
+        const currentArticle: ArticleContent = article;
+        const firstEntry: PathEntry = { ...startArticle, timestamp: Date.now() };
+
+        const cache = new Map<string, ArticleContent>();
+        cache.set(article.title, currentArticle);
+
+        set({
+          startArticle,
+          targetArticle,
+          currentArticle,
+          path: [firstEntry],
+          steps: 0,
+          status: 'playing',
+          loading: false,
+          articleCache: cache,
+        });
+      }
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
     }

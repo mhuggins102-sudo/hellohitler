@@ -80,7 +80,7 @@ export function VictoryModal() {
             You made it!
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            You reached <span className="font-semibold text-amber-600 dark:text-amber-400">{targetArticle?.displayTitle}</span> in{' '}
+            You reached <span className="font-semibold text-amber-600 dark:text-amber-400">{targetArticle?.displayTitle?.replace(/<[^>]*>/g, '')}</span> in{' '}
             <span className="font-bold text-blue-600 dark:text-blue-400">{steps}</span>{' '}
             {steps === 1 ? 'step' : 'steps'}!
           </p>
@@ -103,8 +103,9 @@ export function VictoryModal() {
                         ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 font-medium'
                         : 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                   }`}
-                  dangerouslySetInnerHTML={{ __html: entry.displayTitle }}
-                />
+                >
+                  {entry.displayTitle?.replace(/<[^>]*>/g, '')}
+                </span>
               </span>
             ))}
           </div>
@@ -183,7 +184,7 @@ export function VictoryModal() {
             path={path}
             steps={steps}
             mode={mode}
-            targetTitle={targetArticle?.displayTitle || ''}
+            targetTitle={targetArticle?.displayTitle?.replace(/<[^>]*>/g, '') || ''}
           />
         </div>
 

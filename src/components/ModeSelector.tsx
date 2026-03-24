@@ -2,9 +2,11 @@ interface ModeSelectorProps {
   onSelectClassic: () => void;
   onSelectFreePlay: () => void;
   onSelectDaily: () => void;
+  reversed: boolean;
+  onToggleReversed: () => void;
 }
 
-export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily }: ModeSelectorProps) {
+export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily, reversed, onToggleReversed }: ModeSelectorProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
       {/* Logo */}
@@ -16,6 +18,26 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily 
           Navigate from one Wikipedia article to another using only the links within each page.
         </p>
       </div>
+
+      {/* Direction toggle */}
+      <button
+        onClick={onToggleReversed}
+        title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
+        className="flex items-center gap-2 px-4 py-2 mb-6 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
+      >
+        <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
+        <svg
+          className={`w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-transform ${reversed ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+        <span className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+          {reversed ? 'From Hitler' : 'To Hitler'}
+        </span>
+      </button>
 
       {/* Mode cards */}
       <div className="grid gap-4 w-full max-w-md">
@@ -33,7 +55,10 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily 
                 Classic
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                Random start → find your way to <strong>Adolf Hitler</strong> in as few clicks as possible.
+                {reversed
+                  ? <>Find your way from <strong>Adolf Hitler</strong> → random end in as few clicks as possible.</>
+                  : <>Random start → find your way to <strong>Adolf Hitler</strong> in as few clicks as possible.</>
+                }
               </p>
             </div>
           </div>

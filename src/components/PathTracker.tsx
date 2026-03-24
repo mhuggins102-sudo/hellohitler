@@ -23,8 +23,9 @@ export function PathTracker() {
                     ? 'font-medium text-blue-600 dark:text-blue-400'
                     : 'text-gray-600 dark:text-gray-300'
                 }`}
-                dangerouslySetInnerHTML={{ __html: entry.displayTitle }}
-              />
+              >
+                {entry.displayTitle}
+              </span>
             </li>
           ))}
         </ol>

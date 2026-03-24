@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ModeSelector } from '../components/ModeSelector';
 import { ArticleSearch } from '../components/ArticleSearch';
 import { DailyDistribution } from '../components/DailyDistribution';
 import { DailyLeaderboard } from '../components/DailyLeaderboard';
+import { ShareCard, generateShareText } from '../components/ShareCard';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_TARGET } from '../utils/constants';
 import { hasCompletedToday, getPlayerTodayResult, fetchDailyDistribution } from '../services/firebase';
+import { captureAndShare, copyToClipboard } from '../services/shareService';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function HomePage() {
@@ -14,7 +16,7 @@ export function HomePage() {
   const [showDailyCompleted, setShowDailyCompleted] = useState(false);
   const [freePlayStart, setFreePlayStart] = useState('');
   const [freePlayTarget, setFreePlayTarget] = useState(DEFAULT_TARGET);
-  // false = normal (player selection -> Hitler), true = reversed (Hitler -> player selection)
+  // false = normal (start -> Hitler), true = reversed (Hitler -> target)
   const [reversed, setReversed] = useState(false);
   const [dailyResult, setDailyResult] = useState<{ name: string; steps: number } | null>(null);
   const [dailyStats, setDailyStats] = useState<{
@@ -22,6 +24,11 @@ export function HomePage() {
     totalPlayers: number;
     leaderboard: LeaderboardEntry[];
   } | null>(null);
+
+  // Share state for daily completed page
+  const shareCardRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   // Poll daily stats when viewing completed state
   useEffect(() => {
@@ -45,6 +52,10 @@ export function HomePage() {
     }
   };
 
+  const handleToggleReversed = () => {
+    setReversed((prev) => !prev);
+  };
+
   const handleSwapDirection = () => {
     setReversed((prev) => !prev);
     // Swap the current values
@@ -52,6 +63,26 @@ export function HomePage() {
     const oldTarget = freePlayTarget;
     setFreePlayStart(oldTarget);
     setFreePlayTarget(oldStart);
+  };
+
+  const handleScreenshot = async () => {
+    if (!shareCardRef.current) return;
+    setSharing(true);
+    try {
+      await captureAndShare(shareCardRef.current);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleCopyText = async () => {
+    if (!dailyResult) return;
+    const text = generateShareText(dailyResult.steps, 'daily');
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   if (showDailyCompleted) {
@@ -97,6 +128,43 @@ export function HomePage() {
                 playerSteps={dailyResult?.steps ?? 0}
               />
             </>
+          )}
+
+          {/* Share buttons */}
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={handleScreenshot}
+              disabled={sharing}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {sharing ? 'Capturing...' : 'Share Image'}
+            </button>
+            <button
+              onClick={handleCopyText}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              {copied ? 'Copied!' : 'Copy Result'}
+            </button>
+          </div>
+
+          {/* Hidden share card for screenshot capture */}
+          {dailyResult && (
+            <div className="fixed -left-[9999px] top-0">
+              <ShareCard
+                ref={shareCardRef}
+                path={[]}
+                steps={dailyResult.steps}
+                mode="daily"
+                targetTitle=""
+              />
+            </div>
           )}
         </div>
       </div>
@@ -194,9 +262,21 @@ export function HomePage() {
         </div>
       ) : (
         <ModeSelector
-          onSelectClassic={startClassicGame}
-          onSelectFreePlay={() => setShowFreePlay(true)}
+          onSelectClassic={() => startClassicGame(reversed)}
+          onSelectFreePlay={() => {
+            // Set Free Play defaults based on current home screen direction
+            if (reversed) {
+              setFreePlayStart(DEFAULT_TARGET);
+              setFreePlayTarget('');
+            } else {
+              setFreePlayStart('');
+              setFreePlayTarget(DEFAULT_TARGET);
+            }
+            setShowFreePlay(true);
+          }}
           onSelectDaily={handleDailyClick}
+          reversed={reversed}
+          onToggleReversed={handleToggleReversed}
         />
       )}
     </>

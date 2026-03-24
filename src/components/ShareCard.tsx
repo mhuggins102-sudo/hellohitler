@@ -76,11 +76,19 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
 ShareCard.displayName = 'ShareCard';
 
 /**
+ * Get the app URL (for sharing)
+ */
+export function getAppUrl(): string {
+  return typeof window !== 'undefined' ? window.location.origin : '';
+}
+
+/**
  * Generate Wordle-style spoiler-free share text
  */
 export function generateShareText(steps: number, mode: GameMode): string {
   const puzzleNumber = getDailyPuzzleNumber();
   const squares = '⬜'.repeat(Math.max(0, steps - 1)) + '🎯';
+  const appUrl = getAppUrl();
 
   const header = mode === 'daily'
     ? `WikiPath Daily #${puzzleNumber}`
@@ -88,5 +96,15 @@ export function generateShareText(steps: number, mode: GameMode): string {
       ? 'WikiPath Classic'
       : 'WikiPath Free Play';
 
-  return `${header}\n🟩 ${steps} ${steps === 1 ? 'step' : 'steps'}\n${squares}`;
+  const lines = [
+    header,
+    `🟩 ${steps} ${steps === 1 ? 'step' : 'steps'}`,
+    squares,
+  ];
+
+  if (appUrl) {
+    lines.push('', appUrl);
+  }
+
+  return lines.join('\n');
 }
