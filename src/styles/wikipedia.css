@@ -6,6 +6,7 @@
   color: #333;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  overflow-x: hidden;
 }
 
 .wiki-content h1,
@@ -86,6 +87,7 @@
   border: 1px solid #d1d5db;
   background: #f9fafb;
   font-size: 13px;
+  overflow-x: hidden;
 }
 
 .wiki-content .thumb {
@@ -113,6 +115,43 @@
 
 .wiki-content .thumbinner {
   max-width: 100%;
+}
+
+/* Mobile: unfloat large images and infoboxes, center them */
+@media (max-width: 640px) {
+  .wiki-content .infobox {
+    float: none;
+    margin: 12px auto;
+    max-width: 100%;
+    display: block;
+  }
+
+  .wiki-content .thumb.tright,
+  .wiki-content .thumb.tleft {
+    float: none;
+    margin: 8px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .wiki-content .thumbinner {
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .wiki-content table {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wiki-content img {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 .wiki-content .reflist,

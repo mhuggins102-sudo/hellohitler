@@ -18,6 +18,7 @@ import { getTodayString } from '../utils/seededRandom';
 const COMPLETED_KEY_PREFIX = 'wikipath-daily-completed-';
 const SUBMITTED_KEY_PREFIX = 'wikipath-daily-submitted-';
 const PLAYER_RESULT_PREFIX = 'wikipath-daily-player-';
+const PUZZLE_SUBMITTED_PREFIX = 'wikipath-puzzle-submitted-';
 
 // --- Firebase initialization ---
 
@@ -208,4 +209,79 @@ export function getCompletedDates(): string[] {
     }
   }
   return dates.sort().reverse();
+}
+
+// --- Shared puzzle leaderboard ---
+
+export function hasSubmittedPuzzle(puzzleId: string): boolean {
+  return localStorage.getItem(PUZZLE_SUBMITTED_PREFIX + puzzleId) === 'true';
+}
+
+export async function submitPuzzleResult(
+  puzzleId: string,
+  steps: number,
+  playerName: string,
+  pathTitles?: string[],
+): Promise<void> {
+  if (hasSubmittedPuzzle(puzzleId)) return;
+
+  const entry: LeaderboardEntry & { path?: string[] } = {
+    name: playerName,
+    steps,
+    timestamp: Date.now(),
+  };
+  if (pathTitles) entry.path = pathTitles;
+
+  const firestore = getDb();
+  if (firestore) {
+    try {
+      const submissionsRef = collection(firestore, 'sharedPuzzles', puzzleId, 'submissions');
+      await addDoc(submissionsRef, entry);
+    } catch (e) {
+      console.error('Firestore write failed:', e);
+    }
+  }
+
+  localStorage.setItem(PUZZLE_SUBMITTED_PREFIX + puzzleId, 'true');
+}
+
+export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
+  distribution: Record<number, number>;
+  totalPlayers: number;
+  leaderboard: LeaderboardEntry[];
+}> {
+  const firestore = getDb();
+  if (!firestore) {
+    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
+  }
+
+  try {
+    const submissionsRef = collection(firestore, 'sharedPuzzles', puzzleId, 'submissions');
+    const snapshot = await getDocs(submissionsRef);
+
+    const distribution: Record<number, number> = {};
+    const leaderboard: LeaderboardEntry[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const steps = data.steps as number;
+      distribution[steps] = (distribution[steps] || 0) + 1;
+      leaderboard.push({
+        name: data.name as string,
+        steps,
+        timestamp: data.timestamp as number,
+      });
+    });
+
+    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+
+    return {
+      distribution,
+      totalPlayers: leaderboard.length,
+      leaderboard,
+    };
+  } catch (e) {
+    console.error('Firestore read failed:', e);
+    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
+  }
 }

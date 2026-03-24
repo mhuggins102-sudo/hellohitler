@@ -4,11 +4,11 @@ import { generateShareText } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndSave, shareText } from '../services/shareService';
-import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily } from '../services/firebase';
+import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily, submitPuzzleResult, fetchPuzzleDistribution, hasSubmittedPuzzle } from '../services/firebase';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
-  const { status, steps, path, mode, targetArticle, dailyDate, reset } = useGameStore();
+  const { status, steps, path, mode, startArticle, targetArticle, dailyDate, puzzleId, reset } = useGameStore();
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
   const [playerName, setPlayerName] = useState('');
@@ -19,24 +19,35 @@ export function VictoryModal() {
     leaderboard: LeaderboardEntry[];
   } | null>(null);
 
+  const showLeaderboard = mode === 'daily' || !!puzzleId;
+
   // Check if already submitted on mount
   useEffect(() => {
-    if (status !== 'won' || mode !== 'daily') return;
-    if (hasSubmittedDaily(dailyDate || undefined)) {
-      setNameSubmitted(true);
-      fetchDailyDistribution(dailyDate || undefined).then(setDailyStats);
+    if (status !== 'won') return;
+    if (mode === 'daily') {
+      if (hasSubmittedDaily(dailyDate || undefined)) {
+        setNameSubmitted(true);
+        fetchDailyDistribution(dailyDate || undefined).then(setDailyStats);
+      }
+    } else if (puzzleId) {
+      if (hasSubmittedPuzzle(puzzleId)) {
+        setNameSubmitted(true);
+        fetchPuzzleDistribution(puzzleId).then(setDailyStats);
+      }
     }
-  }, [status, mode, dailyDate]);
+  }, [status, mode, dailyDate, puzzleId]);
 
   // Poll for updated stats every 30 seconds after submission
   useEffect(() => {
-    if (!nameSubmitted || mode !== 'daily') return;
+    if (!nameSubmitted || !showLeaderboard) return;
     const interval = setInterval(async () => {
-      const stats = await fetchDailyDistribution(dailyDate || undefined);
-      setDailyStats(stats);
+      const stats = mode === 'daily'
+        ? await fetchDailyDistribution(dailyDate || undefined)
+        : puzzleId ? await fetchPuzzleDistribution(puzzleId) : null;
+      if (stats) setDailyStats(stats);
     }, 30000);
     return () => clearInterval(interval);
-  }, [nameSubmitted, mode, dailyDate]);
+  }, [nameSubmitted, showLeaderboard, mode, dailyDate, puzzleId]);
 
   if (status !== 'won') return null;
 
@@ -44,9 +55,15 @@ export function VictoryModal() {
     const trimmed = playerName.trim();
     if (!trimmed) return;
     const pathTitles = path.map((e) => e.displayTitle);
-    await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles);
-    const stats = await fetchDailyDistribution(dailyDate || undefined);
-    setDailyStats(stats);
+    if (mode === 'daily') {
+      await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles);
+      const stats = await fetchDailyDistribution(dailyDate || undefined);
+      setDailyStats(stats);
+    } else if (puzzleId) {
+      await submitPuzzleResult(puzzleId, steps, trimmed, pathTitles);
+      const stats = await fetchPuzzleDistribution(puzzleId);
+      setDailyStats(stats);
+    }
     setNameSubmitted(true);
   };
 
@@ -61,7 +78,7 @@ export function VictoryModal() {
   };
 
   const handleSharePuzzle = async () => {
-    const text = generateShareText(steps, mode, dailyDate);
+    const text = generateShareText(steps, mode, dailyDate, startArticle?.title, targetArticle?.title);
     const success = await shareText(text);
     if (success) {
       setShared(true);
@@ -110,8 +127,8 @@ export function VictoryModal() {
           </div>
         </div>
 
-        {/* Daily mode: name entry + leaderboard */}
-        {mode === 'daily' && !nameSubmitted && (
+        {/* Name entry + leaderboard (daily or shared puzzle) */}
+        {showLeaderboard && !nameSubmitted && (
           <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 mb-4">
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
               Record Your Score
@@ -137,8 +154,8 @@ export function VictoryModal() {
           </div>
         )}
 
-        {/* Daily distribution + leaderboard */}
-        {mode === 'daily' && dailyStats && dailyStats.totalPlayers > 0 && (
+        {/* Distribution + leaderboard */}
+        {showLeaderboard && dailyStats && dailyStats.totalPlayers > 0 && (
           <>
             <DailyDistribution
               distribution={dailyStats.distribution}

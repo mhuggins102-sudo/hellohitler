@@ -6,6 +6,8 @@ export interface DailyPuzzle {
   targetArticle: string;
   dateString: string;
   puzzleNumber: number;
+  reversed: boolean;
+  hardMode: boolean;
 }
 
 /**
@@ -18,31 +20,40 @@ export function getDailyPuzzle(dateStr?: string): DailyPuzzle {
 
   const articles = [...CURATED_ARTICLES];
 
-  // Pick start article
-  const startIdx = Math.floor(rng() * articles.length);
-  const startArticle = articles[startIdx];
+  // Determine mode distribution:
+  // 1/3 Hitler → random (reversed), 1/3 random → Hitler (normal), 1/3 Hard mode
+  const modeRoll = rng();
+  let reversed: boolean;
+  let hardMode: boolean;
 
-  // Pick target article (different from start)
-  // ~50% of daily puzzles use Hitler as target for thematic consistency,
-  // the other 50% pick a random target
-  const useDefaultTarget = rng() < 0.5;
-
-  let targetArticle: string;
-  if (useDefaultTarget) {
-    targetArticle = DEFAULT_TARGET;
+  if (modeRoll < 1 / 3) {
+    // Hitler → random end
+    reversed = true;
+    hardMode = false;
+  } else if (modeRoll < 2 / 3) {
+    // Random start → Hitler
+    reversed = false;
+    hardMode = false;
   } else {
-    // Remove start from candidates
-    const candidates = articles.filter((_, i) => i !== startIdx);
-    // Also remove Hitler from random target pool so it's only used in the 50% case
-    const filtered = candidates.filter(a => a !== DEFAULT_TARGET);
-    const targetIdx = Math.floor(rng() * filtered.length);
-    targetArticle = filtered[targetIdx];
+    // Hard mode: half in each direction
+    hardMode = true;
+    reversed = rng() < 0.5;
   }
+
+  // Pick a random article (not Hitler) for the non-Hitler endpoint
+  const candidates = articles.filter(a => a !== DEFAULT_TARGET);
+  const randomIdx = Math.floor(rng() * candidates.length);
+  const randomArticle = candidates[randomIdx];
+
+  const startArticle = reversed ? DEFAULT_TARGET : randomArticle;
+  const targetArticle = reversed ? randomArticle : DEFAULT_TARGET;
 
   return {
     startArticle,
     targetArticle,
     dateString: date,
     puzzleNumber: getDailyPuzzleNumber(),
+    reversed,
+    hardMode,
   };
 }

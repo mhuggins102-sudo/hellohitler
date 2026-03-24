@@ -6,6 +6,7 @@ import { DailyLeaderboard } from '../components/DailyLeaderboard';
 import { generateShareText } from '../components/ShareCard';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_TARGET } from '../utils/constants';
+import { generatePuzzleUrl } from '../components/ShareCard';
 import { hasCompletedDaily, getPlayerResult, fetchDailyDistribution } from '../services/firebase';
 import { captureAndSave, shareText } from '../services/shareService';
 import { getTodayString, getPuzzleNumberForDate } from '../utils/seededRandom';
@@ -29,6 +30,7 @@ export function HomePage() {
 
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Poll daily stats when viewing completed state
   useEffect(() => {
@@ -334,17 +336,46 @@ export function HomePage() {
               <p className="text-red-500 text-sm">{error}</p>
             )}
 
-            <button
-              onClick={() => {
-                if (freePlayStart && freePlayTarget) {
-                  startFreePlayGame(freePlayStart, freePlayTarget);
-                }
-              }}
-              disabled={!freePlayStart || !freePlayTarget || loading}
-              className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Starting...' : 'Start Game'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  if (freePlayStart && freePlayTarget) {
+                    startFreePlayGame(freePlayStart, freePlayTarget);
+                  }
+                }}
+                disabled={!freePlayStart || !freePlayTarget || loading}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Starting...' : 'Start Game'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (freePlayStart && freePlayTarget) {
+                    const url = generatePuzzleUrl(freePlayStart, freePlayTarget);
+                    try {
+                      await navigator.clipboard.writeText(url);
+                    } catch {
+                      // fallback
+                      const ta = document.createElement('textarea');
+                      ta.value = url;
+                      document.body.appendChild(ta);
+                      ta.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(ta);
+                    }
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }
+                }}
+                disabled={!freePlayStart || !freePlayTarget}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                {linkCopied ? 'Copied!' : 'Generate Link'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -8,10 +8,9 @@ import '../styles/wikipedia.css';
 
 export function ArticleViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentArticle, loading, navigateTo, hardMode, mode } = useGameStore();
+  const { currentArticle, loading, navigateTo, hardMode } = useGameStore();
 
-  // Hard mode only applies to Classic and Free Play
-  const hardModeActive = hardMode && mode !== 'daily';
+  const hardModeActive = hardMode;
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     const anchor = findAnchorElement(e.target);
@@ -56,7 +55,7 @@ export function ArticleViewer() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 md:p-6 relative"
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 relative"
     >
       {loading && (
         <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 z-10 flex items-start justify-center pt-20">

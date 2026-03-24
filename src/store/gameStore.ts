@@ -4,6 +4,7 @@ import { fetchArticle, fetchRandomArticle } from '../services/wikipediaApi';
 import { DEFAULT_TARGET, DEFAULT_TARGET_DISPLAY } from '../utils/constants';
 import { getDailyPuzzle } from '../services/dailyPuzzle';
 import { hasCompletedDaily, markDailyCompleted } from '../services/firebase';
+import { getPuzzleId } from '../utils/puzzleLink';
 
 interface GameStore {
   mode: GameMode;
@@ -16,6 +17,7 @@ interface GameStore {
   loading: boolean;
   error: string | null;
   hardMode: boolean;
+  puzzleId: string | null;
 
   // Cache of fetched articles for back-navigation
   articleCache: Map<string, ArticleContent>;
@@ -24,6 +26,7 @@ interface GameStore {
   startClassicGame: (reversed?: boolean) => Promise<void>;
   startFreePlayGame: (startTitle: string, targetTitle: string) => Promise<void>;
   startDailyGame: (dateStr?: string) => Promise<void>;
+  startSharedPuzzle: (startTitle: string, targetTitle: string) => Promise<void>;
   dailyDate: string | null;
   setHardMode: (on: boolean) => void;
   navigateTo: (title: string) => Promise<void>;
@@ -44,6 +47,7 @@ const initialState = {
   articleCache: new Map<string, ArticleContent>(),
   dailyDate: null as string | null,
   hardMode: false,
+  puzzleId: null as string | null,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -149,6 +153,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  startSharedPuzzle: async (startTitle: string, targetTitle: string) => {
+    const pid = getPuzzleId(startTitle, targetTitle);
+    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode: false, puzzleId: pid });
+
+    try {
+      const article = await fetchArticle(startTitle);
+      if (!article) throw new Error('Failed to fetch start article');
+
+      const startArticle: Article = { title: article.title, displayTitle: article.displayTitle };
+
+      const targetCheck = await fetchArticle(targetTitle);
+      if (!targetCheck) throw new Error('Target article not found');
+      const targetArticle: Article = { title: targetCheck.title, displayTitle: targetCheck.displayTitle };
+
+      const currentArticle: ArticleContent = article;
+      const firstEntry: PathEntry = { ...startArticle, timestamp: Date.now() };
+
+      const cache = new Map<string, ArticleContent>();
+      cache.set(article.title, currentArticle);
+
+      set({
+        startArticle,
+        targetArticle,
+        currentArticle,
+        path: [firstEntry],
+        steps: 0,
+        status: 'playing',
+        loading: false,
+        articleCache: cache,
+      });
+    } catch (err) {
+      set({ error: (err as Error).message, loading: false });
+    }
+  },
+
   startDailyGame: async (dateStr?: string) => {
     // Prevent replay if already completed
     if (hasCompletedDaily(dateStr)) {
@@ -156,10 +195,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null, hardMode: false });
+    const puzzle = getDailyPuzzle(dateStr);
+    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null, hardMode: puzzle.hardMode });
 
     try {
-      const puzzle = getDailyPuzzle(dateStr);
       const article = await fetchArticle(puzzle.startArticle);
       if (!article) throw new Error('Failed to fetch daily start article');
 
