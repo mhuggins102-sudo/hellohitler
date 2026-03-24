@@ -119,7 +119,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startFreePlayGame: async (startTitle: string, targetTitle: string) => {
     const hardMode = get().hardMode;
-    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode });
+    const pid = getPuzzleId(startTitle, targetTitle);
+    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode, puzzleId: pid });
 
     try {
       const article = await fetchArticle(startTitle);
