@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Daily puzzle submissions: anyone can read and create
+    match /dailyPuzzles/{date}/submissions/{submission} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['name', 'steps', 'timestamp'])
+                    && request.resource.data.name is string
+                    && request.resource.data.steps is int
+                    && request.resource.data.timestamp is int;
+      allow update, delete: if false;
+    }
+
+    // Shared puzzle submissions: anyone can read and create
+    match /sharedPuzzles/{puzzleId}/submissions/{submission} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['name', 'steps', 'timestamp'])
+                    && request.resource.data.name is string
+                    && request.resource.data.steps is int
+                    && request.resource.data.timestamp is int;
+      allow update, delete: if false;
+    }
+  }
+}

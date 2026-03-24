@@ -135,6 +135,7 @@ export async function submitDailyResult(
 
 /**
  * Fetch distribution and leaderboard from Firestore.
+ * Merges local player data to guarantee the current player always appears.
  */
 export async function fetchDailyDistribution(dateStr?: string): Promise<{
   distribution: Record<number, number>;
@@ -142,21 +143,21 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
   leaderboard: LeaderboardEntry[];
 }> {
   const date = dateStr || getTodayString();
+  const localPlayer = getPlayerResult(date);
 
-  const localFallback = () => {
-    const playerResult = getPlayerResult(date);
-    if (playerResult) {
+  const buildLocal = () => {
+    if (localPlayer) {
       return {
-        distribution: { [playerResult.steps]: 1 } as Record<number, number>,
+        distribution: { [localPlayer.steps]: 1 } as Record<number, number>,
         totalPlayers: 1,
-        leaderboard: [{ name: playerResult.name, steps: playerResult.steps, timestamp: 0 }],
+        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 }],
       };
     }
     return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
   };
 
   const firestore = getDb();
-  if (!firestore) return localFallback();
+  if (!firestore) return buildLocal();
 
   try {
     const submissionsRef = collection(firestore, 'dailyPuzzles', date, 'submissions');
@@ -176,11 +177,15 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
       });
     });
 
-    // Sort client-side: by steps ascending, then timestamp ascending
-    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+    // Merge local player if their entry isn't in Firestore results
+    if (localPlayer && !leaderboard.some((e) => e.name === localPlayer.name && e.steps === localPlayer.steps)) {
+      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 });
+      distribution[localPlayer.steps] = (distribution[localPlayer.steps] || 0) + 1;
+    }
 
-    // If Firestore returned nothing, fall back to local data
-    if (leaderboard.length === 0) return localFallback();
+    if (leaderboard.length === 0) return buildLocal();
+
+    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
 
     return {
       distribution,
@@ -189,7 +194,7 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
     };
   } catch (e) {
     console.error('Firestore read failed:', e);
-    return localFallback();
+    return buildLocal();
   }
 }
 
@@ -227,6 +232,14 @@ export function getCompletedDates(): string[] {
 }
 
 // --- Shared puzzle leaderboard ---
+
+function getPuzzlePlayerResult(puzzleId: string): { name: string; steps: number } | null {
+  try {
+    const stored = localStorage.getItem('wikipath-puzzle-player-' + puzzleId);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return null;
+}
 
 export function hasSubmittedPuzzle(puzzleId: string): boolean {
   return localStorage.getItem(PUZZLE_SUBMITTED_PREFIX + puzzleId) === 'true';
@@ -271,23 +284,21 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
   totalPlayers: number;
   leaderboard: LeaderboardEntry[];
 }> {
-  const localFallback = () => {
-    try {
-      const stored = localStorage.getItem('wikipath-puzzle-player-' + puzzleId);
-      if (stored) {
-        const result = JSON.parse(stored);
-        return {
-          distribution: { [result.steps]: 1 } as Record<number, number>,
-          totalPlayers: 1,
-          leaderboard: [{ name: result.name, steps: result.steps, timestamp: 0 }],
-        };
-      }
-    } catch { /* ignore */ }
+  const localPlayer = getPuzzlePlayerResult(puzzleId);
+
+  const buildLocal = () => {
+    if (localPlayer) {
+      return {
+        distribution: { [localPlayer.steps]: 1 } as Record<number, number>,
+        totalPlayers: 1,
+        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 }],
+      };
+    }
     return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
   };
 
   const firestore = getDb();
-  if (!firestore) return localFallback();
+  if (!firestore) return buildLocal();
 
   try {
     const submissionsRef = collection(firestore, 'sharedPuzzles', puzzleId, 'submissions');
@@ -307,10 +318,15 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
       });
     });
 
-    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+    // Merge local player if their entry isn't in Firestore results
+    if (localPlayer && !leaderboard.some((e) => e.name === localPlayer.name && e.steps === localPlayer.steps)) {
+      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 });
+      distribution[localPlayer.steps] = (distribution[localPlayer.steps] || 0) + 1;
+    }
 
-    // If Firestore returned nothing, fall back to local data
-    if (leaderboard.length === 0) return localFallback();
+    if (leaderboard.length === 0) return buildLocal();
+
+    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
 
     return {
       distribution,
@@ -319,6 +335,6 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
     };
   } catch (e) {
     console.error('Firestore read failed:', e);
-    return localFallback();
+    return buildLocal();
   }
 }
