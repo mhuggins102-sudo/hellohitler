@@ -11,11 +11,19 @@ export function getAppUrl(): string {
 
 /**
  * Generate a shareable puzzle URL for classic/freeplay modes.
+ * Includes hardMode and timer settings as query params.
  */
-export function generatePuzzleUrl(startTitle: string, targetTitle: string): string {
+export function generatePuzzleUrl(
+  startTitle: string,
+  targetTitle: string,
+  options?: { hardMode?: boolean; timer?: boolean },
+): string {
   const appUrl = getAppUrl();
   const encoded = encodePuzzle(startTitle, targetTitle);
-  return `${appUrl}?puzzle=${encoded}`;
+  let url = `${appUrl}?puzzle=${encoded}`;
+  if (options?.hardMode) url += '&h=1';
+  if (options?.timer) url += '&t=1';
+  return url;
 }
 
 /**
@@ -29,6 +37,8 @@ export function generateShareText(
   dailyDate?: string | null,
   startTitle?: string,
   targetTitle?: string,
+  elapsedTime?: number | null,
+  options?: { hardMode?: boolean; timer?: boolean },
 ): string {
   const dateStr = dailyDate || getTodayString();
   const puzzleNumber = mode === 'daily' ? getPuzzleNumberForDate(dateStr) : getDailyPuzzleNumber();
@@ -44,15 +54,20 @@ export function generateShareText(
   const lines = [
     header,
     `🟩 ${steps} ${steps === 1 ? 'step' : 'steps'}`,
-    squares,
   ];
+
+  if (elapsedTime != null) {
+    lines.push(`⏱️ ${formatElapsedTime(elapsedTime)}`);
+  }
+
+  lines.push(squares);
 
   if (appUrl) {
     let url: string;
     if (mode === 'daily') {
       url = `${appUrl}?daily=${dateStr}`;
     } else if (startTitle && targetTitle) {
-      url = generatePuzzleUrl(startTitle, targetTitle);
+      url = generatePuzzleUrl(startTitle, targetTitle, options);
     } else {
       url = appUrl;
     }
@@ -60,4 +75,14 @@ export function generateShareText(
   }
 
   return lines.join('\n');
+}
+
+export function formatElapsedTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
 }

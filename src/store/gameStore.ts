@@ -3,7 +3,7 @@ import type { GameMode, GameStatus, Article, ArticleContent, PathEntry } from '.
 import { fetchArticle, fetchRandomArticle } from '../services/wikipediaApi';
 import { DEFAULT_TARGET, DEFAULT_TARGET_DISPLAY } from '../utils/constants';
 import { getDailyPuzzle } from '../services/dailyPuzzle';
-import { hasCompletedDaily, markDailyCompleted } from '../services/firebase';
+import { hasCompletedDaily, markDailyCompleted, addGameHistoryEntry } from '../services/firebase';
 import { getPuzzleId } from '../utils/puzzleLink';
 
 interface GameStore {
@@ -18,6 +18,9 @@ interface GameStore {
   error: string | null;
   hardMode: boolean;
   puzzleId: string | null;
+  timerEnabled: boolean;
+  startTime: number | null;
+  elapsedTime: number | null;
 
   // Cache of fetched articles for back-navigation
   articleCache: Map<string, ArticleContent>;
@@ -26,9 +29,10 @@ interface GameStore {
   startClassicGame: (reversed?: boolean) => Promise<void>;
   startFreePlayGame: (startTitle: string, targetTitle: string) => Promise<void>;
   startDailyGame: (dateStr?: string) => Promise<void>;
-  startSharedPuzzle: (startTitle: string, targetTitle: string) => Promise<void>;
+  startSharedPuzzle: (startTitle: string, targetTitle: string, options?: { hardMode?: boolean; timer?: boolean }) => Promise<void>;
   dailyDate: string | null;
   setHardMode: (on: boolean) => void;
+  setTimerEnabled: (on: boolean) => void;
   navigateTo: (title: string) => Promise<void>;
   goBack: () => void;
   reset: () => void;
@@ -48,6 +52,9 @@ const initialState = {
   dailyDate: null as string | null,
   hardMode: false,
   puzzleId: null as string | null,
+  timerEnabled: false,
+  startTime: null as number | null,
+  elapsedTime: null as number | null,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -55,18 +62,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startClassicGame: async (reversed = false) => {
     const hardMode = get().hardMode;
-    set({ ...initialState, mode: 'classic', loading: true, articleCache: new Map(), hardMode });
+    const timerEnabled = get().timerEnabled;
+    set({ ...initialState, mode: 'classic', loading: true, articleCache: new Map(), hardMode, timerEnabled });
 
     try {
       const random = await fetchRandomArticle();
       if (!random) throw new Error('Failed to get random article');
 
       if (reversed) {
-        // Reversed: start from Hitler, navigate to random target
         const hitlerArticle = await fetchArticle(DEFAULT_TARGET);
         if (!hitlerArticle) throw new Error('Failed to fetch start article');
 
-        // Validate random target exists
         const targetCheck = await fetchArticle(random.title);
         if (!targetCheck) throw new Error('Failed to fetch target article');
 
@@ -88,9 +94,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           loading: false,
           articleCache: cache,
           puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
+          startTime: Date.now(),
         });
       } else {
-        // Normal: random start, navigate to Hitler
         const article = await fetchArticle(random.title);
         if (!article) throw new Error('Failed to fetch article');
 
@@ -112,6 +118,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           loading: false,
           articleCache: cache,
           puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
+          startTime: Date.now(),
         });
       }
     } catch (err) {
@@ -121,8 +128,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   startFreePlayGame: async (startTitle: string, targetTitle: string) => {
     const hardMode = get().hardMode;
+    const timerEnabled = get().timerEnabled;
     const pid = getPuzzleId(startTitle, targetTitle);
-    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode, puzzleId: pid });
+    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode, timerEnabled, puzzleId: pid });
 
     try {
       const article = await fetchArticle(startTitle);
@@ -130,7 +138,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const startArticle: Article = { title: article.title, displayTitle: article.displayTitle };
 
-      // Validate target exists
       const targetCheck = await fetchArticle(targetTitle);
       if (!targetCheck) throw new Error('Target article not found');
       const targetArticle: Article = { title: targetCheck.title, displayTitle: targetCheck.displayTitle };
@@ -151,15 +158,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         loading: false,
         articleCache: cache,
         puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
+        startTime: Date.now(),
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
     }
   },
 
-  startSharedPuzzle: async (startTitle: string, targetTitle: string) => {
+  startSharedPuzzle: async (startTitle: string, targetTitle: string, options?: { hardMode?: boolean; timer?: boolean }) => {
     const pid = getPuzzleId(startTitle, targetTitle);
-    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode: false, puzzleId: pid });
+    const hardMode = options?.hardMode ?? false;
+    const timerEnabled = options?.timer ?? false;
+    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode, timerEnabled, puzzleId: pid });
 
     try {
       const article = await fetchArticle(startTitle);
@@ -187,6 +197,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         loading: false,
         articleCache: cache,
         puzzleId: getPuzzleId(startArticle.title, targetArticle.title),
+        startTime: Date.now(),
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
@@ -194,14 +205,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startDailyGame: async (dateStr?: string) => {
-    // Prevent replay if already completed
     if (hasCompletedDaily(dateStr)) {
       set({ error: 'You already completed this daily puzzle!' });
       return;
     }
 
     const puzzle = getDailyPuzzle(dateStr);
-    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null, hardMode: puzzle.hardMode });
+    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null, hardMode: puzzle.hardMode, timerEnabled: true });
 
     try {
       const article = await fetchArticle(puzzle.startArticle);
@@ -209,7 +219,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const startArticle: Article = { title: article.title, displayTitle: article.displayTitle };
 
-      // Fetch target to get proper display title
       const targetCheck = await fetchArticle(puzzle.targetArticle);
       const targetArticle: Article = {
         title: targetCheck?.title || puzzle.targetArticle,
@@ -231,6 +240,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: 'playing',
         loading: false,
         articleCache: cache,
+        startTime: Date.now(),
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
@@ -239,6 +249,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setHardMode: (on: boolean) => {
     set({ hardMode: on });
+  },
+
+  setTimerEnabled: (on: boolean) => {
+    set({ timerEnabled: on });
   },
 
   navigateTo: async (title: string) => {
@@ -250,7 +264,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       let article: ArticleContent;
 
-      // Check cache first
       const cached = articleCache.get(title);
       if (cached) {
         article = cached;
@@ -270,13 +283,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const newPath = [...get().path, newEntry];
       const newSteps = get().steps + 1;
 
-      // Check win condition (case-insensitive comparison)
       const won = targetArticle &&
         article.title.toLowerCase() === targetArticle.title.toLowerCase();
 
-      // Mark daily puzzle as completed on win
       if (won && get().mode === 'daily') {
         markDailyCompleted(get().dailyDate || undefined);
+      }
+
+      const elapsed = won && get().startTime ? Date.now() - get().startTime! : null;
+
+      if (won) {
+        const state = get();
+        addGameHistoryEntry({
+          mode: state.mode,
+          startTitle: state.startArticle?.title || '',
+          startDisplayTitle: state.startArticle?.displayTitle || '',
+          targetTitle: state.targetArticle?.title || '',
+          targetDisplayTitle: state.targetArticle?.displayTitle || '',
+          steps: newSteps,
+          elapsedTime: elapsed,
+          date: new Date().toISOString(),
+          puzzleId: state.puzzleId || '',
+          path: newPath.map(e => e.displayTitle),
+          hardMode: state.hardMode,
+          timerEnabled: state.timerEnabled,
+          dailyDate: state.dailyDate,
+        });
       }
 
       set({
@@ -285,6 +317,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         steps: newSteps,
         status: won ? 'won' : 'playing',
         loading: false,
+        elapsedTime: elapsed,
       });
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
@@ -309,6 +342,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   reset: () => {
-    set({ ...initialState, articleCache: new Map() });
+    const hardMode = get().hardMode;
+    const timerEnabled = get().timerEnabled;
+    set({ ...initialState, articleCache: new Map(), hardMode, timerEnabled });
   },
 }));

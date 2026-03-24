@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { generateShareText } from './ShareCard';
+import { formatElapsedTime } from './ShareCard';
 import { DailyDistribution } from './DailyDistribution';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { captureAndSave, shareText } from '../services/shareService';
@@ -8,7 +9,7 @@ import { submitDailyResult, fetchDailyDistribution, hasSubmittedDaily, submitPuz
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function VictoryModal() {
-  const { status, steps, path, mode, startArticle, targetArticle, dailyDate, puzzleId, reset } = useGameStore();
+  const { status, steps, path, mode, startArticle, targetArticle, dailyDate, puzzleId, reset, elapsedTime, timerEnabled, hardMode } = useGameStore();
   const [shared, setShared] = useState(false);
   const [saving, setSaving] = useState(false);
   const [playerName, setPlayerName] = useState(() => getStoredUsername() || '');
@@ -45,11 +46,11 @@ export function VictoryModal() {
       if (storedName && showLeaderboard) {
         const pathTitles = path.map((e) => e.displayTitle);
         if (mode === 'daily') {
-          await submitDailyResult(steps, storedName, dailyDate || undefined, pathTitles);
+          await submitDailyResult(steps, storedName, dailyDate || undefined, pathTitles, elapsedTime);
           const stats = await fetchDailyDistribution(dailyDate || undefined);
           setDailyStats(stats);
         } else if (puzzleId) {
-          await submitPuzzleResult(puzzleId, steps, storedName, pathTitles);
+          await submitPuzzleResult(puzzleId, steps, storedName, pathTitles, elapsedTime);
           const stats = await fetchPuzzleDistribution(puzzleId);
           setDailyStats(stats);
         }
@@ -80,11 +81,11 @@ export function VictoryModal() {
     setStoredUsername(trimmed);
     const pathTitles = path.map((e) => e.displayTitle);
     if (mode === 'daily') {
-      await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles);
+      await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles, elapsedTime);
       const stats = await fetchDailyDistribution(dailyDate || undefined);
       setDailyStats(stats);
     } else if (puzzleId) {
-      await submitPuzzleResult(puzzleId, steps, trimmed, pathTitles);
+      await submitPuzzleResult(puzzleId, steps, trimmed, pathTitles, elapsedTime);
       const stats = await fetchPuzzleDistribution(puzzleId);
       setDailyStats(stats);
     }
@@ -102,7 +103,12 @@ export function VictoryModal() {
   };
 
   const handleSharePuzzle = async () => {
-    const text = generateShareText(steps, mode, dailyDate, startArticle?.title, targetArticle?.title);
+    const text = generateShareText(
+      steps, mode, dailyDate,
+      startArticle?.title, targetArticle?.title,
+      timerEnabled ? elapsedTime : null,
+      { hardMode, timer: timerEnabled },
+    );
     const success = await shareText(text);
     if (success) {
       setShared(true);
@@ -122,7 +128,13 @@ export function VictoryModal() {
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             You reached <span className="font-semibold text-amber-600 dark:text-amber-400">{targetArticle?.displayTitle}</span> in{' '}
             <span className="font-bold text-blue-600 dark:text-blue-400">{steps}</span>{' '}
-            {steps === 1 ? 'step' : 'steps'}!
+            {steps === 1 ? 'step' : 'steps'}
+            {timerEnabled && elapsedTime != null && (
+              <span className="text-gray-500 dark:text-gray-400">
+                {' '}in {formatElapsedTime(elapsedTime)}
+              </span>
+            )}
+            !
           </p>
         </div>
 

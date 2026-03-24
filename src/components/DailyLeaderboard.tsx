@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from '../services/firebase';
+import { formatElapsedTime } from './ShareCard';
 
 interface DailyLeaderboardProps {
   leaderboard: LeaderboardEntry[];
@@ -46,13 +47,24 @@ export function DailyLeaderboard({ leaderboard, playerSteps }: DailyLeaderboardP
               }`}>
                 {entry.name}
               </span>
-              <span className={`text-sm font-mono ${
-                isPlayer
-                  ? 'font-bold text-blue-600 dark:text-blue-400'
-                  : 'text-gray-500 dark:text-gray-400'
-              }`}>
-                {entry.steps} {entry.steps === 1 ? 'step' : 'steps'}
-              </span>
+              <div className="text-right shrink-0">
+                <span className={`text-sm font-mono ${
+                  isPlayer
+                    ? 'font-bold text-blue-600 dark:text-blue-400'
+                    : 'text-gray-500 dark:text-gray-400'
+                }`}>
+                  {entry.steps} {entry.steps === 1 ? 'step' : 'steps'}
+                </span>
+                {entry.elapsedTime != null && (
+                  <span className={`text-xs ml-2 ${
+                    isPlayer
+                      ? 'text-blue-500 dark:text-blue-400'
+                      : 'text-gray-400 dark:text-gray-500'
+                  }`}>
+                    {formatElapsedTime(entry.elapsedTime)}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}

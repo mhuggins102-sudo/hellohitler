@@ -4,6 +4,7 @@ import { ArticleSearch } from '../components/ArticleSearch';
 import { DailyDistribution } from '../components/DailyDistribution';
 import { DailyLeaderboard } from '../components/DailyLeaderboard';
 import { generateShareText } from '../components/ShareCard';
+import { PuzzleHistory } from '../components/PuzzleHistory';
 import { useGameStore } from '../store/gameStore';
 import { DEFAULT_TARGET } from '../utils/constants';
 import { generatePuzzleUrl } from '../components/ShareCard';
@@ -13,10 +14,11 @@ import { getTodayString, getPuzzleNumberForDate } from '../utils/seededRandom';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function HomePage() {
-  const { startClassicGame, startFreePlayGame, startDailyGame, loading, error, hardMode, setHardMode } = useGameStore();
+  const { startClassicGame, startFreePlayGame, startDailyGame, loading, error, hardMode, setHardMode, timerEnabled, setTimerEnabled } = useGameStore();
   const [showFreePlay, setShowFreePlay] = useState(false);
   const [showDailyCompleted, setShowDailyCompleted] = useState(false);
   const [showDailyHistory, setShowDailyHistory] = useState(false);
+  const [showPuzzleHistory, setShowPuzzleHistory] = useState(false);
   const [freePlayStart, setFreePlayStart] = useState('');
   const [freePlayTarget, setFreePlayTarget] = useState(DEFAULT_TARGET);
   const [reversed, setReversed] = useState(false);
@@ -351,7 +353,10 @@ export function HomePage() {
               <button
                 onClick={async () => {
                   if (freePlayStart && freePlayTarget) {
-                    const url = generatePuzzleUrl(freePlayStart, freePlayTarget);
+                    const url = generatePuzzleUrl(freePlayStart, freePlayTarget, {
+                      hardMode,
+                      timer: timerEnabled,
+                    });
                     try {
                       await navigator.clipboard.writeText(url);
                     } catch {
@@ -413,7 +418,13 @@ export function HomePage() {
           onToggleReversed={handleToggleReversed}
           hardMode={hardMode}
           onToggleHardMode={() => setHardMode(!hardMode)}
+          timerEnabled={timerEnabled}
+          onToggleTimer={() => setTimerEnabled(!timerEnabled)}
+          onOpenHistory={() => setShowPuzzleHistory(true)}
         />
+      )}
+      {showPuzzleHistory && (
+        <PuzzleHistory onClose={() => setShowPuzzleHistory(false)} />
       )}
     </>
   );

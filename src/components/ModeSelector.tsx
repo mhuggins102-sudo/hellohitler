@@ -6,11 +6,28 @@ interface ModeSelectorProps {
   onToggleReversed: () => void;
   hardMode: boolean;
   onToggleHardMode: () => void;
+  timerEnabled: boolean;
+  onToggleTimer: () => void;
+  onOpenHistory: () => void;
 }
 
-export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily, reversed, onToggleReversed, hardMode, onToggleHardMode }: ModeSelectorProps) {
+export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily, reversed, onToggleReversed, hardMode, onToggleHardMode, timerEnabled, onToggleTimer, onOpenHistory }: ModeSelectorProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
+      {/* History button - top right */}
+      <div className="fixed top-4 right-4 z-10">
+        <button
+          onClick={onOpenHistory}
+          title="Puzzle History"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+          <span className="text-sm font-medium hidden sm:inline">History</span>
+        </button>
+      </div>
+
       {/* Logo */}
       <div className="text-center mb-6">
         <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -87,7 +104,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
         </button>
       </div>
 
-      {/* Direction toggle + Hard Mode - centered below cards */}
+      {/* Direction toggle + Hard Mode + Timer - centered below cards */}
       <div className="flex items-center justify-center gap-3 mt-6 w-full max-w-md">
         <button
           onClick={onToggleReversed}
@@ -144,6 +161,28 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
               : 'text-gray-600 dark:text-gray-300'
           }`}>
             Hard
+          </span>
+        </button>
+
+        {/* Timer toggle */}
+        <button
+          onClick={onToggleTimer}
+          title="Timer: track elapsed time as a tiebreaker (always on for Daily)"
+          className={`flex items-center justify-center gap-2 w-24 py-2 rounded-xl border transition-all ${
+            timerEnabled
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm'
+              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md'
+          }`}
+        >
+          <svg className={`w-4 h-4 ${timerEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className={`text-sm font-medium ${
+            timerEnabled
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-gray-600 dark:text-gray-300'
+          }`}>
+            Timer
           </span>
         </button>
       </div>

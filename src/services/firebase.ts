@@ -14,12 +14,14 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { getTodayString } from '../utils/seededRandom';
+import type { GameMode } from '../types/game';
 
 const COMPLETED_KEY_PREFIX = 'wikipath-daily-completed-';
 const SUBMITTED_KEY_PREFIX = 'wikipath-daily-submitted-';
 const PLAYER_RESULT_PREFIX = 'wikipath-daily-player-';
 const PUZZLE_SUBMITTED_PREFIX = 'wikipath-puzzle-submitted-';
 const USERNAME_KEY = 'wikipath-username';
+const GAME_HISTORY_KEY = 'wikipath-game-history';
 
 // --- Username persistence ---
 
@@ -66,6 +68,23 @@ export interface LeaderboardEntry {
   name: string;
   steps: number;
   timestamp: number;
+  elapsedTime?: number | null;
+}
+
+export interface GameHistoryEntry {
+  mode: GameMode;
+  startTitle: string;
+  startDisplayTitle: string;
+  targetTitle: string;
+  targetDisplayTitle: string;
+  steps: number;
+  elapsedTime: number | null;
+  date: string;
+  puzzleId: string;
+  path: string[];
+  hardMode: boolean;
+  timerEnabled: boolean;
+  dailyDate?: string | null;
 }
 
 // --- Local flags (localStorage) ---
@@ -89,6 +108,28 @@ export function hasSubmittedDaily(dateStr?: string): boolean {
   return localStorage.getItem(SUBMITTED_KEY_PREFIX + date) === 'true';
 }
 
+// --- Game history (localStorage) ---
+
+export function addGameHistoryEntry(entry: GameHistoryEntry): void {
+  const history = getGameHistory();
+  history.unshift(entry);
+  // Keep last 200 entries
+  if (history.length > 200) history.length = 200;
+  localStorage.setItem(GAME_HISTORY_KEY, JSON.stringify(history));
+}
+
+export function getGameHistory(): GameHistoryEntry[] {
+  try {
+    const stored = localStorage.getItem(GAME_HISTORY_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function getGameHistoryByMode(mode: GameMode): GameHistoryEntry[] {
+  return getGameHistory().filter(e => e.mode === mode);
+}
+
 // --- Firestore operations ---
 
 /**
@@ -100,6 +141,7 @@ export async function submitDailyResult(
   playerName: string,
   dateStr?: string,
   pathTitles?: string[],
+  elapsedTime?: number | null,
 ): Promise<void> {
   const date = dateStr || getTodayString();
 
@@ -111,6 +153,7 @@ export async function submitDailyResult(
     timestamp: Date.now(),
   };
   if (pathTitles) entry.path = pathTitles;
+  if (elapsedTime != null) entry.elapsedTime = elapsedTime;
 
   // Save to Firestore
   const firestore = getDb();
@@ -129,8 +172,19 @@ export async function submitDailyResult(
   // Save player result locally for getPlayerResult()
   localStorage.setItem(
     PLAYER_RESULT_PREFIX + date,
-    JSON.stringify({ name: playerName, steps, path: pathTitles || [] }),
+    JSON.stringify({ name: playerName, steps, path: pathTitles || [], elapsedTime: elapsedTime ?? null }),
   );
+}
+
+function sortLeaderboard(leaderboard: LeaderboardEntry[]): void {
+  leaderboard.sort((a, b) => {
+    if (a.steps !== b.steps) return a.steps - b.steps;
+    // Tiebreaker: faster elapsed time wins
+    const aTime = a.elapsedTime ?? Infinity;
+    const bTime = b.elapsedTime ?? Infinity;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.timestamp - b.timestamp;
+  });
 }
 
 /**
@@ -150,7 +204,7 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
       return {
         distribution: { [localPlayer.steps]: 1 } as Record<number, number>,
         totalPlayers: 1,
-        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 }],
+        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0, elapsedTime: localPlayer.elapsedTime }],
       };
     }
     return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
@@ -174,18 +228,19 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
         name: data.name as string,
         steps,
         timestamp: data.timestamp as number,
+        elapsedTime: (data.elapsedTime as number | undefined) ?? null,
       });
     });
 
     // Merge local player if their entry isn't in Firestore results
     if (localPlayer && !leaderboard.some((e) => e.name === localPlayer.name && e.steps === localPlayer.steps)) {
-      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 });
+      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0, elapsedTime: localPlayer.elapsedTime });
       distribution[localPlayer.steps] = (distribution[localPlayer.steps] || 0) + 1;
     }
 
     if (leaderboard.length === 0) return buildLocal();
 
-    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+    sortLeaderboard(leaderboard);
 
     return {
       distribution,
@@ -201,7 +256,7 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
 /**
  * Get the player's saved result for a given date.
  */
-export function getPlayerResult(dateStr?: string): { name: string; steps: number; path: string[] } | null {
+export function getPlayerResult(dateStr?: string): { name: string; steps: number; path: string[]; elapsedTime?: number | null } | null {
   const date = dateStr || getTodayString();
   try {
     const stored = localStorage.getItem(PLAYER_RESULT_PREFIX + date);
@@ -233,7 +288,7 @@ export function getCompletedDates(): string[] {
 
 // --- Shared puzzle leaderboard ---
 
-function getPuzzlePlayerResult(puzzleId: string): { name: string; steps: number } | null {
+function getPuzzlePlayerResult(puzzleId: string): { name: string; steps: number; elapsedTime?: number | null } | null {
   try {
     const stored = localStorage.getItem('wikipath-puzzle-player-' + puzzleId);
     if (stored) return JSON.parse(stored);
@@ -250,6 +305,7 @@ export async function submitPuzzleResult(
   steps: number,
   playerName: string,
   pathTitles?: string[],
+  elapsedTime?: number | null,
 ): Promise<void> {
   if (hasSubmittedPuzzle(puzzleId)) return;
 
@@ -259,6 +315,7 @@ export async function submitPuzzleResult(
     timestamp: Date.now(),
   };
   if (pathTitles) entry.path = pathTitles;
+  if (elapsedTime != null) entry.elapsedTime = elapsedTime;
 
   const firestore = getDb();
   if (firestore) {
@@ -275,7 +332,7 @@ export async function submitPuzzleResult(
   // Save player result locally for fallback
   localStorage.setItem(
     'wikipath-puzzle-player-' + puzzleId,
-    JSON.stringify({ name: playerName, steps, path: pathTitles || [] }),
+    JSON.stringify({ name: playerName, steps, path: pathTitles || [], elapsedTime: elapsedTime ?? null }),
   );
 }
 
@@ -291,7 +348,7 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
       return {
         distribution: { [localPlayer.steps]: 1 } as Record<number, number>,
         totalPlayers: 1,
-        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 }],
+        leaderboard: [{ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0, elapsedTime: localPlayer.elapsedTime }],
       };
     }
     return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
@@ -315,18 +372,19 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
         name: data.name as string,
         steps,
         timestamp: data.timestamp as number,
+        elapsedTime: (data.elapsedTime as number | undefined) ?? null,
       });
     });
 
     // Merge local player if their entry isn't in Firestore results
     if (localPlayer && !leaderboard.some((e) => e.name === localPlayer.name && e.steps === localPlayer.steps)) {
-      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0 });
+      leaderboard.push({ name: localPlayer.name, steps: localPlayer.steps, timestamp: 0, elapsedTime: localPlayer.elapsedTime });
       distribution[localPlayer.steps] = (distribution[localPlayer.steps] || 0) + 1;
     }
 
     if (leaderboard.length === 0) return buildLocal();
 
-    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+    sortLeaderboard(leaderboard);
 
     return {
       distribution,

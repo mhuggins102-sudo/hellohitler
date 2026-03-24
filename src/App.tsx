@@ -24,8 +24,10 @@ function App() {
     if (puzzleParam) {
       const puzzle = decodePuzzle(puzzleParam);
       if (puzzle) {
+        const hardMode = params.get('h') === '1';
+        const timer = params.get('t') === '1';
         window.history.replaceState({}, '', window.location.pathname);
-        startSharedPuzzle(puzzle.start, puzzle.target);
+        startSharedPuzzle(puzzle.start, puzzle.target, { hardMode, timer });
       }
     }
   }, [startDailyGame, startSharedPuzzle]);
