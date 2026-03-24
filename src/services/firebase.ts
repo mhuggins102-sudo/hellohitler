@@ -143,19 +143,20 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
 }> {
   const date = dateStr || getTodayString();
 
-  const firestore = getDb();
-  if (!firestore) {
-    // No Firebase — return empty (or single-player data if submitted)
+  const localFallback = () => {
     const playerResult = getPlayerResult(date);
     if (playerResult) {
       return {
-        distribution: { [playerResult.steps]: 1 },
+        distribution: { [playerResult.steps]: 1 } as Record<number, number>,
         totalPlayers: 1,
         leaderboard: [{ name: playerResult.name, steps: playerResult.steps, timestamp: 0 }],
       };
     }
-    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
-  }
+    return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
+  };
+
+  const firestore = getDb();
+  if (!firestore) return localFallback();
 
   try {
     const submissionsRef = collection(firestore, 'dailyPuzzles', date, 'submissions');
@@ -178,6 +179,9 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
     // Sort client-side: by steps ascending, then timestamp ascending
     leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
 
+    // If Firestore returned nothing, fall back to local data
+    if (leaderboard.length === 0) return localFallback();
+
     return {
       distribution,
       totalPlayers: leaderboard.length,
@@ -185,7 +189,7 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
     };
   } catch (e) {
     console.error('Firestore read failed:', e);
-    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
+    return localFallback();
   }
 }
 
@@ -267,22 +271,23 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
   totalPlayers: number;
   leaderboard: LeaderboardEntry[];
 }> {
-  const firestore = getDb();
-  if (!firestore) {
-    // Fallback to localStorage
+  const localFallback = () => {
     try {
       const stored = localStorage.getItem('wikipath-puzzle-player-' + puzzleId);
       if (stored) {
         const result = JSON.parse(stored);
         return {
-          distribution: { [result.steps]: 1 },
+          distribution: { [result.steps]: 1 } as Record<number, number>,
           totalPlayers: 1,
           leaderboard: [{ name: result.name, steps: result.steps, timestamp: 0 }],
         };
       }
     } catch { /* ignore */ }
-    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
-  }
+    return { distribution: {} as Record<number, number>, totalPlayers: 0, leaderboard: [] as LeaderboardEntry[] };
+  };
+
+  const firestore = getDb();
+  if (!firestore) return localFallback();
 
   try {
     const submissionsRef = collection(firestore, 'sharedPuzzles', puzzleId, 'submissions');
@@ -304,6 +309,9 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
 
     leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
 
+    // If Firestore returned nothing, fall back to local data
+    if (leaderboard.length === 0) return localFallback();
+
     return {
       distribution,
       totalPlayers: leaderboard.length,
@@ -311,6 +319,6 @@ export async function fetchPuzzleDistribution(puzzleId: string): Promise<{
     };
   } catch (e) {
     console.error('Firestore read failed:', e);
-    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
+    return localFallback();
   }
 }
