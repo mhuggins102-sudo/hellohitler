@@ -1,14 +1,54 @@
 /**
  * Firebase service for daily puzzle stats.
  *
- * Falls back to localStorage when Firebase is not configured.
+ * Uses Firestore for shared leaderboard data.
+ * localStorage is used only for local flags (completed, submitted).
  */
 
+import { initializeApp } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  Firestore,
+} from 'firebase/firestore';
 import { getTodayString } from '../utils/seededRandom';
 
-const STORAGE_KEY = 'wikipath-daily-results';
-const SUBMITTED_KEY = 'wikipath-daily-submitted';
 const COMPLETED_KEY_PREFIX = 'wikipath-daily-completed-';
+const SUBMITTED_KEY_PREFIX = 'wikipath-daily-submitted-';
+const PLAYER_RESULT_PREFIX = 'wikipath-daily-player-';
+
+// --- Firebase initialization ---
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+
+let db: Firestore | null = null;
+
+function getDb(): Firestore | null {
+  if (db) return db;
+  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    console.warn('Firebase not configured — leaderboard will not be shared.');
+    return null;
+  }
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    return db;
+  } catch (e) {
+    console.error('Firebase init failed:', e);
+    return null;
+  }
+}
+
+// --- Types ---
 
 export interface LeaderboardEntry {
   name: string;
@@ -16,103 +56,73 @@ export interface LeaderboardEntry {
   timestamp: number;
 }
 
-interface DailyData {
-  entries: number[];
-  leaderboard: LeaderboardEntry[];
-  submittedByPlayer: boolean;
-  playerName?: string;
-  playerSteps?: number;
-  playerPath?: string[];
-}
+// --- Local flags (localStorage) ---
 
-interface DailyResults {
-  [date: string]: DailyData;
-}
-
-function getStoredResults(): DailyResults {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  } catch {
-    return {};
-  }
-}
-
-function saveResults(results: DailyResults): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(results));
-}
-
-function ensureDateEntry(results: DailyResults, date: string): DailyData {
-  if (!results[date]) {
-    results[date] = { entries: [], leaderboard: [], submittedByPlayer: false };
-  }
-  if (!results[date].leaderboard) {
-    results[date].leaderboard = [];
-  }
-  return results[date];
-}
-
-/**
- * Check if the player already completed a daily puzzle for a given date.
- */
 export function hasCompletedDaily(dateStr?: string): boolean {
   const date = dateStr || getTodayString();
-  const completed = localStorage.getItem(COMPLETED_KEY_PREFIX + date);
-  return completed === 'true';
+  return localStorage.getItem(COMPLETED_KEY_PREFIX + date) === 'true';
 }
 
-/** Alias for backwards compat */
 export function hasCompletedToday(): boolean {
   return hasCompletedDaily(getTodayString());
 }
 
-/**
- * Mark a daily puzzle as completed (prevents replay).
- */
 export function markDailyCompleted(dateStr?: string): void {
   const date = dateStr || getTodayString();
   localStorage.setItem(COMPLETED_KEY_PREFIX + date, 'true');
 }
 
-/**
- * Check if the player already submitted a result for a given date.
- */
 export function hasSubmittedDaily(dateStr?: string): boolean {
   const date = dateStr || getTodayString();
-  const results = getStoredResults();
-  return results[date]?.submittedByPlayer === true;
+  return localStorage.getItem(SUBMITTED_KEY_PREFIX + date) === 'true';
 }
 
+// --- Firestore operations ---
+
 /**
- * Submit a daily puzzle result with the player's name.
+ * Submit a daily puzzle result.
+ * Writes to Firestore collection: dailyPuzzles/{date}/submissions
  */
-export async function submitDailyResult(steps: number, playerName: string, dateStr?: string, pathTitles?: string[]): Promise<void> {
+export async function submitDailyResult(
+  steps: number,
+  playerName: string,
+  dateStr?: string,
+  pathTitles?: string[],
+): Promise<void> {
   const date = dateStr || getTodayString();
 
   if (hasSubmittedDaily(date)) return;
 
-  const results = getStoredResults();
-  const data = ensureDateEntry(results, date);
-
-  data.entries.push(steps);
-  data.submittedByPlayer = true;
-  data.playerName = playerName;
-  data.playerSteps = steps;
-  if (pathTitles) data.playerPath = pathTitles;
-
-  data.leaderboard.push({
+  const entry: LeaderboardEntry & { path?: string[] } = {
     name: playerName,
     steps,
     timestamp: Date.now(),
-  });
+  };
+  if (pathTitles) entry.path = pathTitles;
 
-  data.leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+  // Save to Firestore
+  const firestore = getDb();
+  if (firestore) {
+    try {
+      const submissionsRef = collection(firestore, 'dailyPuzzles', date, 'submissions');
+      await addDoc(submissionsRef, entry);
+    } catch (e) {
+      console.error('Firestore write failed:', e);
+    }
+  }
 
-  saveResults(results);
-  localStorage.setItem(SUBMITTED_KEY, date);
+  // Mark as submitted locally
+  localStorage.setItem(SUBMITTED_KEY_PREFIX + date, 'true');
+
+  // Save player result locally for getPlayerResult()
+  localStorage.setItem(
+    PLAYER_RESULT_PREFIX + date,
+    JSON.stringify({ name: playerName, steps, path: pathTitles || [] }),
+  );
 }
 
 /**
- * Fetch the distribution and leaderboard for a given date's puzzle.
+ * Fetch distribution and leaderboard from Firestore.
  */
 export async function fetchDailyDistribution(dateStr?: string): Promise<{
   distribution: Record<number, number>;
@@ -120,37 +130,65 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
   leaderboard: LeaderboardEntry[];
 }> {
   const date = dateStr || getTodayString();
-  const results = getStoredResults();
-  const data = results[date];
-  const entries = data?.entries || [];
-  const leaderboard = data?.leaderboard || [];
 
-  const distribution: Record<number, number> = {};
-  for (const steps of entries) {
-    distribution[steps] = (distribution[steps] || 0) + 1;
+  const firestore = getDb();
+  if (!firestore) {
+    // No Firebase — return empty (or single-player data if submitted)
+    const playerResult = getPlayerResult(date);
+    if (playerResult) {
+      return {
+        distribution: { [playerResult.steps]: 1 },
+        totalPlayers: 1,
+        leaderboard: [{ name: playerResult.name, steps: playerResult.steps, timestamp: 0 }],
+      };
+    }
+    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
   }
 
-  return {
-    distribution,
-    totalPlayers: entries.length,
-    leaderboard,
-  };
+  try {
+    const submissionsRef = collection(firestore, 'dailyPuzzles', date, 'submissions');
+    const snapshot = await getDocs(submissionsRef);
+
+    const distribution: Record<number, number> = {};
+    const leaderboard: LeaderboardEntry[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const steps = data.steps as number;
+      distribution[steps] = (distribution[steps] || 0) + 1;
+      leaderboard.push({
+        name: data.name as string,
+        steps,
+        timestamp: data.timestamp as number,
+      });
+    });
+
+    // Sort client-side: by steps ascending, then timestamp ascending
+    leaderboard.sort((a, b) => a.steps - b.steps || a.timestamp - b.timestamp);
+
+    return {
+      distribution,
+      totalPlayers: leaderboard.length,
+      leaderboard,
+    };
+  } catch (e) {
+    console.error('Firestore read failed:', e);
+    return { distribution: {}, totalPlayers: 0, leaderboard: [] };
+  }
 }
 
 /**
- * Get the player's saved result for a given date (if any).
+ * Get the player's saved result for a given date.
  */
 export function getPlayerResult(dateStr?: string): { name: string; steps: number; path: string[] } | null {
   const date = dateStr || getTodayString();
-  const results = getStoredResults();
-  const data = results[date];
-  if (data?.submittedByPlayer && data.playerName && data.playerSteps !== undefined) {
-    return { name: data.playerName, steps: data.playerSteps, path: data.playerPath || [] };
-  }
+  try {
+    const stored = localStorage.getItem(PLAYER_RESULT_PREFIX + date);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
   return null;
 }
 
-/** Alias for backwards compat */
 export function getPlayerTodayResult(): { name: string; steps: number; path: string[] } | null {
   return getPlayerResult(getTodayString());
 }
