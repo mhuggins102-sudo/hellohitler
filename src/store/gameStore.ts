@@ -15,6 +15,7 @@ interface GameStore {
   status: GameStatus;
   loading: boolean;
   error: string | null;
+  hardMode: boolean;
 
   // Cache of fetched articles for back-navigation
   articleCache: Map<string, ArticleContent>;
@@ -24,6 +25,7 @@ interface GameStore {
   startFreePlayGame: (startTitle: string, targetTitle: string) => Promise<void>;
   startDailyGame: (dateStr?: string) => Promise<void>;
   dailyDate: string | null;
+  setHardMode: (on: boolean) => void;
   navigateTo: (title: string) => Promise<void>;
   goBack: () => void;
   reset: () => void;
@@ -41,13 +43,15 @@ const initialState = {
   error: null as string | null,
   articleCache: new Map<string, ArticleContent>(),
   dailyDate: null as string | null,
+  hardMode: false,
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
   ...initialState,
 
   startClassicGame: async (reversed = false) => {
-    set({ ...initialState, mode: 'classic', loading: true, articleCache: new Map() });
+    const hardMode = get().hardMode;
+    set({ ...initialState, mode: 'classic', loading: true, articleCache: new Map(), hardMode });
 
     try {
       const random = await fetchRandomArticle();
@@ -110,7 +114,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startFreePlayGame: async (startTitle: string, targetTitle: string) => {
-    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map() });
+    const hardMode = get().hardMode;
+    set({ ...initialState, mode: 'freeplay', loading: true, articleCache: new Map(), hardMode });
 
     try {
       const article = await fetchArticle(startTitle);
@@ -151,7 +156,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return;
     }
 
-    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null });
+    set({ ...initialState, mode: 'daily', loading: true, articleCache: new Map(), dailyDate: dateStr || null, hardMode: false });
 
     try {
       const puzzle = getDailyPuzzle(dateStr);
@@ -186,6 +191,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     } catch (err) {
       set({ error: (err as Error).message, loading: false });
     }
+  },
+
+  setHardMode: (on: boolean) => {
+    set({ hardMode: on });
   },
 
   navigateTo: async (title: string) => {

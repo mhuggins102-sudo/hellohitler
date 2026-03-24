@@ -12,14 +12,14 @@ import { getTodayString, getPuzzleNumberForDate } from '../utils/seededRandom';
 import type { LeaderboardEntry } from '../services/firebase';
 
 export function HomePage() {
-  const { startClassicGame, startFreePlayGame, startDailyGame, loading, error } = useGameStore();
+  const { startClassicGame, startFreePlayGame, startDailyGame, loading, error, hardMode, setHardMode } = useGameStore();
   const [showFreePlay, setShowFreePlay] = useState(false);
   const [showDailyCompleted, setShowDailyCompleted] = useState(false);
   const [showDailyHistory, setShowDailyHistory] = useState(false);
   const [freePlayStart, setFreePlayStart] = useState('');
   const [freePlayTarget, setFreePlayTarget] = useState(DEFAULT_TARGET);
   const [reversed, setReversed] = useState(false);
-  const [dailyResult, setDailyResult] = useState<{ name: string; steps: number } | null>(null);
+  const [dailyResult, setDailyResult] = useState<{ name: string; steps: number; path: string[] } | null>(null);
   const [dailyViewDate, setDailyViewDate] = useState(getTodayString());
   const [dailyStats, setDailyStats] = useState<{
     distribution: Record<number, number>;
@@ -70,7 +70,7 @@ export function HomePage() {
     if (!dailyResult) return;
     setSaving(true);
     try {
-      await captureAndSave(dailyResult.steps, 'daily', [], '', dailyViewDate);
+      await captureAndSave(dailyResult.steps, 'daily', dailyResult.path, '', dailyViewDate);
     } finally {
       setSaving(false);
     }
@@ -380,6 +380,8 @@ export function HomePage() {
           onSelectDaily={handleDailyClick}
           reversed={reversed}
           onToggleReversed={handleToggleReversed}
+          hardMode={hardMode}
+          onToggleHardMode={() => setHardMode(!hardMode)}
         />
       )}
     </>

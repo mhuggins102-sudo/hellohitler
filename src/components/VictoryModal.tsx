@@ -43,7 +43,8 @@ export function VictoryModal() {
   const handleNameSubmit = async () => {
     const trimmed = playerName.trim();
     if (!trimmed) return;
-    await submitDailyResult(steps, trimmed, dailyDate || undefined);
+    const pathTitles = path.map((e) => e.displayTitle);
+    await submitDailyResult(steps, trimmed, dailyDate || undefined, pathTitles);
     const stats = await fetchDailyDistribution(dailyDate || undefined);
     setDailyStats(stats);
     setNameSubmitted(true);

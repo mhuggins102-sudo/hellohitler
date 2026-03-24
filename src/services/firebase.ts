@@ -22,6 +22,7 @@ interface DailyData {
   submittedByPlayer: boolean;
   playerName?: string;
   playerSteps?: number;
+  playerPath?: string[];
 }
 
 interface DailyResults {
@@ -84,7 +85,7 @@ export function hasSubmittedDaily(dateStr?: string): boolean {
 /**
  * Submit a daily puzzle result with the player's name.
  */
-export async function submitDailyResult(steps: number, playerName: string, dateStr?: string): Promise<void> {
+export async function submitDailyResult(steps: number, playerName: string, dateStr?: string, pathTitles?: string[]): Promise<void> {
   const date = dateStr || getTodayString();
 
   if (hasSubmittedDaily(date)) return;
@@ -96,6 +97,7 @@ export async function submitDailyResult(steps: number, playerName: string, dateS
   data.submittedByPlayer = true;
   data.playerName = playerName;
   data.playerSteps = steps;
+  if (pathTitles) data.playerPath = pathTitles;
 
   data.leaderboard.push({
     name: playerName,
@@ -138,18 +140,18 @@ export async function fetchDailyDistribution(dateStr?: string): Promise<{
 /**
  * Get the player's saved result for a given date (if any).
  */
-export function getPlayerResult(dateStr?: string): { name: string; steps: number } | null {
+export function getPlayerResult(dateStr?: string): { name: string; steps: number; path: string[] } | null {
   const date = dateStr || getTodayString();
   const results = getStoredResults();
   const data = results[date];
   if (data?.submittedByPlayer && data.playerName && data.playerSteps !== undefined) {
-    return { name: data.playerName, steps: data.playerSteps };
+    return { name: data.playerName, steps: data.playerSteps, path: data.playerPath || [] };
   }
   return null;
 }
 
 /** Alias for backwards compat */
-export function getPlayerTodayResult(): { name: string; steps: number } | null {
+export function getPlayerTodayResult(): { name: string; steps: number; path: string[] } | null {
   return getPlayerResult(getTodayString());
 }
 

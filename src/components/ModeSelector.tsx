@@ -4,9 +4,11 @@ interface ModeSelectorProps {
   onSelectDaily: () => void;
   reversed: boolean;
   onToggleReversed: () => void;
+  hardMode: boolean;
+  onToggleHardMode: () => void;
 }
 
-export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily, reversed, onToggleReversed }: ModeSelectorProps) {
+export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily, reversed, onToggleReversed, hardMode, onToggleHardMode }: ModeSelectorProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-12 bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
       {/* Logo */}
@@ -85,44 +87,66 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
         </button>
       </div>
 
-      {/* Direction toggle - centered below cards */}
-      <button
-        onClick={onToggleReversed}
-        title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
-        className="flex items-center justify-center gap-3 mt-6 px-5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
-      >
-        {reversed ? (
-          <>
-            <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-              From Hitler
-            </span>
-            <svg
-              className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 rotate-180 transition-transform"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-            <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
-          </>
-        ) : (
-          <>
-            <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
-            <svg
-              className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-transform"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-            <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-              To Hitler
-            </span>
-          </>
-        )}
-      </button>
+      {/* Direction toggle + Hard Mode - centered below cards */}
+      <div className="flex items-center justify-center gap-3 mt-6">
+        <button
+          onClick={onToggleReversed}
+          title={reversed ? 'Direction: Adolf Hitler → Random/Target' : 'Direction: Random/Start → Adolf Hitler'}
+          className="flex items-center justify-center gap-3 px-5 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-md transition-all group"
+        >
+          {reversed ? (
+            <>
+              <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                From Hitler
+              </span>
+              <svg
+                className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
+            </>
+          ) : (
+            <>
+              <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
+              <svg
+                className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              <span className="text-sm text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                To Hitler
+              </span>
+            </>
+          )}
+        </button>
+
+        {/* Hard Mode toggle */}
+        <button
+          onClick={onToggleHardMode}
+          title="Hard Mode: country-related articles are blocked (Classic & Free Play only)"
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
+            hardMode
+              ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 shadow-sm'
+              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500 hover:shadow-md'
+          }`}
+        >
+          <span className="text-lg">💀</span>
+          <span className={`text-sm font-medium ${
+            hardMode
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-gray-600 dark:text-gray-300'
+          }`}>
+            Hard
+          </span>
+        </button>
+      </div>
 
       {/* Footer */}
       <p className="text-xs text-gray-400 dark:text-gray-600 mt-12">
