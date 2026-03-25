@@ -1,18 +1,45 @@
+import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 
 export function GameHeader() {
-  const { currentArticle, targetArticle, steps, status, goBack, reset, path } = useGameStore();
+  const { currentArticle, targetArticle, steps, status, goBack, reset, path, mode } = useGameStore();
+  const [showToast, setShowToast] = useState(false);
+
+  const isDaily = mode === 'daily';
+
+  const handleGoBack = () => {
+    if (isDaily) {
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+      return;
+    }
+    goBack();
+  };
 
   if (status !== 'playing' && status !== 'won') return null;
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between gap-4 shrink-0">
+    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between gap-4 shrink-0 relative">
+      {/* Toast notification */}
+      {showToast && (
+        <div
+          className="absolute top-full left-4 mt-2 z-50 px-3 py-1.5 bg-gray-800 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg"
+          style={{ animation: 'fadeInOut 2s ease-in-out' }}
+        >
+          Unavailable for daily puzzles
+        </div>
+      )}
+
       <div className="flex items-center gap-3 min-w-0">
         <button
-          onClick={goBack}
+          onClick={handleGoBack}
           disabled={path.length <= 1}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed p-1"
-          title="Go back"
+          className={`p-1 ${
+            isDaily && path.length > 1
+              ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed'
+          }`}
+          title={isDaily ? 'Unavailable for daily puzzles' : 'Go back'}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
