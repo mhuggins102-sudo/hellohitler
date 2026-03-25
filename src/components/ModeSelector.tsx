@@ -129,7 +129,7 @@ export function ModeSelector({ onSelectClassic, onSelectFreePlay, onSelectDaily,
         {/* Hard Mode toggle */}
         <button
           onClick={onToggleHardMode}
-          title="Hard Mode: country-related articles are blocked (Classic & Free Play only)"
+          title="Hard Mode: geographic articles are blocked — countries, cities, states, continents (Classic & Free Play only)"
           className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all ${
             hardMode
               ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 shadow-sm'

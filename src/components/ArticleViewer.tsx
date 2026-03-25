@@ -66,7 +66,7 @@ export function ArticleViewer() {
       {/* Hard mode indicator */}
       {hardModeActive && (
         <div className="mb-3 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-600 dark:text-red-400 inline-flex items-center gap-1.5">
-          <span>💀</span> Hard Mode — country articles blocked
+          <span>💀</span> Hard Mode — geographic articles blocked
         </div>
       )}
 
