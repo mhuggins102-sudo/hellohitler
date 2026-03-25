@@ -124,7 +124,7 @@ export function HomePage() {
           </button>
 
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-            Daily Puzzle History
+            Daily Puzzle Archive
           </h2>
 
           <div className="space-y-2">
@@ -301,21 +301,48 @@ export function HomePage() {
               Free Play Setup
             </h2>
 
-            <button
-              onClick={handleSwapDirection}
-              title={reversed ? 'Direction: Hitler → Your choice' : 'Direction: Your choice → Hitler'}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors group"
-            >
-              <span className="text-xl" role="img" aria-label="Swap direction">☸️</span>
-              <svg
-                className={`w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-transform ${reversed ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-2">
+              {/* Direction toggle */}
+              <button
+                onClick={handleSwapDirection}
+                title={reversed ? 'Direction: Hitler → Your choice' : 'Direction: Your choice → Hitler'}
+                className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-all ${
+                  reversed
+                    ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500'
+                }`}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-            </button>
+                <span className="text-lg">☸️</span>
+              </button>
+
+              {/* Hard Mode toggle */}
+              <button
+                onClick={() => setHardMode(!hardMode)}
+                title="Hard Mode"
+                className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-all ${
+                  hardMode
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-red-400 dark:hover:border-red-500'
+                }`}
+              >
+                <span className="text-lg">💀</span>
+              </button>
+
+              {/* Timer toggle */}
+              <button
+                onClick={() => setTimerEnabled(!timerEnabled)}
+                title="Timer"
+                className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-all ${
+                  timerEnabled
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500'
+                }`}
+              >
+                <svg className={`w-5 h-5 ${timerEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-4">
