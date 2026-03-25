@@ -407,9 +407,100 @@ export const BLOCKED_COUNTRY_TERMS: Set<string> = new Set([
   "anchorage",
 ]);
 
+/**
+ * Adjective / demonym forms that should only block when they ARE the article
+ * subject, not when they modify another topic (e.g. "Greek mythology" is OK,
+ * but "Greek" alone or "History of Greek" is blocked).
+ */
+const GEOGRAPHIC_ADJECTIVES: Set<string> = new Set([
+  // African demonyms
+  "algerian", "angolan", "beninese", "botswanan", "burkinabe", "burundian",
+  "cameroonian", "cape verdean", "central african", "chadian", "comorian",
+  "congolese", "ivorian", "djiboutian", "egyptian", "equatoguinean",
+  "eritrean", "swazi", "ethiopian", "gabonese", "gambian", "ghanaian",
+  "guinean", "bissau-guinean", "kenyan", "mosotho", "basotho", "liberian",
+  "libyan", "malagasy", "malawian", "malian", "mauritanian", "mauritian",
+  "moroccan", "mozambican", "namibian", "nigerien", "nigerian", "rwandan",
+  "rwandese", "santomean", "senegalese", "seychellois", "sierra leonean",
+  "somalian", "somali", "south african", "south sudanese", "sudanese",
+  "tanzanian", "togolese", "tunisian", "ugandan", "zambian", "zimbabwean",
+  // Asian demonyms
+  "afghan", "armenian", "azerbaijani", "azeri", "bahraini", "bangladeshi",
+  "bhutanese", "bruneian", "cambodian", "khmer", "chinese", "cypriot",
+  "georgian", "timorese", "indian", "indonesian", "iranian", "persian",
+  "iraqi", "israeli", "japanese", "jordanian", "kazakh", "kazakhstani",
+  "kuwaiti", "kyrgyz", "kyrgyzstani", "laotian", "lebanese", "malaysian",
+  "malay", "maldivian", "mongolian", "burmese", "nepalese", "nepali",
+  "north korean", "omani", "pakistani", "palestinian", "filipino", "filipina",
+  "philippine", "qatari", "saudi", "arabian", "singaporean", "south korean",
+  "korean", "sri lankan", "syrian", "taiwanese", "tajik", "tajikistani",
+  "thai", "turkish", "turkmen", "emirati", "emirian", "uzbek", "uzbekistani",
+  "vietnamese", "yemeni",
+  // European demonyms
+  "albanian", "andorran", "austrian", "belarusian", "byelorussian", "belgian",
+  "bosnian", "herzegovinian", "bulgarian", "croatian", "czech", "danish",
+  "estonian", "finnish", "french", "francophone", "german", "germanic",
+  "greek", "hellenic", "hungarian", "magyar", "icelandic", "irish", "italian",
+  "kosovar", "kosovan", "latvian", "lithuanian", "luxembourgish", "maltese",
+  "moldovan", "monegasque", "monacan", "montenegrin", "dutch", "macedonian",
+  "norwegian", "polish", "portuguese", "romanian", "russian", "sammarinese",
+  "serbian", "slovak", "slovakian", "slovenian", "slovene", "spanish",
+  "swedish", "swiss", "ukrainian", "british", "english", "scottish", "welsh",
+  // North American demonyms
+  "antiguan", "barbudan", "bahamian", "barbadian", "bajan", "belizean",
+  "canadian", "costa rican", "cuban", "dominican", "salvadoran", "salvadorean",
+  "grenadian", "guatemalan", "haitian", "honduran", "jamaican", "mexican",
+  "nicaraguan", "panamanian", "puerto rican", "kittitian", "nevisian",
+  "saint lucian", "vincentian", "trinidadian", "tobagonian", "american",
+  // South American demonyms
+  "argentine", "argentinian", "argentinean", "bolivian", "brazilian",
+  "chilean", "colombian", "ecuadorian", "ecuadorean", "guyanese",
+  "paraguayan", "peruvian", "surinamese", "uruguayan", "venezuelan",
+  // Oceanian demonyms
+  "australian", "aussie", "fijian", "i-kiribati", "marshallese",
+  "micronesian", "nauruan", "palauan", "papua new guinean", "samoan",
+  "solomon islander", "tongan", "tuvaluan", "ni-vanuatu", "vanuatuan",
+  // Continental / regional adjectives
+  "african", "asian", "asiatic", "european", "europeans", "north american",
+  "south american", "central american", "latin american", "oceanian",
+  "antarctic", "arctic", "west indian", "middle eastern", "southeast asian",
+  "east asian", "south asian", "scandinavian", "balkan", "iberian",
+  "caucasian", "mesopotamian", "polynesian", "melanesian", "sub-saharan",
+  "subsaharan",
+  // US state demonyms
+  "alabamian", "alabaman", "alaskan", "arizonan", "arizonian", "arkansan",
+  "californian", "coloradan", "coloradoan", "connecticuter", "delawarean",
+  "floridian", "floridan", "hawaiian", "idahoan", "illinoisan", "indianan",
+  "hoosier", "iowan", "kansan", "kentuckian", "louisianan", "louisianian",
+  "mainer", "marylander", "michigander", "michiganian", "minnesotan",
+  "mississippian", "missourian", "montanan", "nebraskan", "nevadan",
+  "nevadian", "new yorker", "ohioan", "oklahoman", "oregonian",
+  "pennsylvanian", "tennessean", "texan", "utahn", "utahan", "vermonter",
+  "virginian", "washingtonian", "wisconsinite", "wyomingite", "guamanian",
+  // Canadian demonyms
+  "ontarian", "quebecer", "quebecois", "british columbian", "albertan",
+  "manitoban", "nova scotian", "newfoundlander",
+  // City demonyms
+  "chicagoan", "houstonian", "philadelphian", "san franciscan", "seattleite",
+  "bostonian", "nashvillian", "detroiter", "portlander", "atlantan",
+  "miamian", "pittsburgher", "baltimorean", "londoner", "parisian",
+  "berliner", "roman", "muscovite", "cairene", "torontonian", "montrealer",
+  "vancouverite", "dubliner", "viennese", "athenian",
+  // Other adjective forms
+  "dane", "finn", "swede", "briton", "pole", "spaniard", "icelander",
+  "liechtensteiner", "luxembourger", "new zealander", "kiwi",
+  "motswana", "batswana",
+  "north carolinian", "south carolinian", "north dakotan", "south dakotan",
+  "west virginian", "rhode islander", "new mexican", "jerseyan",
+]);
+
 // Pre-compute multi-word terms for efficient matching
 const multiWordTerms: string[] = [];
 const singleWordTerms: Set<string> = new Set();
+
+// Also split adjectives into single/multi for efficient lookup
+const singleWordAdjectives: Set<string> = new Set();
+const multiWordAdjectives: string[] = [];
 
 for (const term of BLOCKED_COUNTRY_TERMS) {
   if (term.includes(" ") || term.includes("-") || term.includes("'")) {
@@ -419,13 +510,27 @@ for (const term of BLOCKED_COUNTRY_TERMS) {
   }
 }
 
+for (const term of GEOGRAPHIC_ADJECTIVES) {
+  if (term.includes(" ") || term.includes("-") || term.includes("'")) {
+    multiWordAdjectives.push(term);
+  } else {
+    singleWordAdjectives.add(term);
+  }
+}
+
 // Sort multi-word terms by length descending so longer matches are checked first
 multiWordTerms.sort((a, b) => b.length - a.length);
 
 /**
- * Checks if a Wikipedia article title contains any country-related blocked term.
- * Uses case-insensitive word-boundary matching so that e.g. "Germany" matches
- * "Germany" and "West Germany" but NOT "germander".
+ * Checks if a Wikipedia article title is a geographic article that should be
+ * blocked in Hard Mode.
+ *
+ * Place-name nouns (Greece, Paris, California) block broadly — if they appear
+ * anywhere in the title the link is blocked.
+ *
+ * Adjective / demonym forms (Greek, Parisian, Californian) only block when
+ * they ARE the entire title or appear after a preposition (e.g. "History of
+ * Greece" is blocked, but "Greek mythology" is allowed).
  */
 export function isCountryRelated(title: string): boolean {
   const lowerTitle = title.toLowerCase();
@@ -435,17 +540,38 @@ export function isCountryRelated(title: string): boolean {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`(?:^|\\b)${escaped}(?:\\b|$)`, "i");
     if (regex.test(lowerTitle)) {
+      // If this multi-word term is an adjective and NOT the full title,
+      // only block if it follows a preposition
+      if (GEOGRAPHIC_ADJECTIVES.has(term) && lowerTitle !== term) {
+        const prepRegex = new RegExp(
+          `\\b(?:of|in|from|about)\\s+${escaped}(?:\\b|$)`,
+          "i"
+        );
+        if (!prepRegex.test(lowerTitle)) {
+          continue; // adjective used as modifier — allow
+        }
+      }
       return true;
     }
   }
 
-  // Check single-word terms by splitting the title into words and looking them up
-  // We split on non-alphanumeric characters to get individual words
+  // Check single-word terms
   const words = lowerTitle.split(/[^a-z0-9]+/).filter(Boolean);
-  for (const word of words) {
-    if (singleWordTerms.has(word)) {
-      return true;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    if (!singleWordTerms.has(word)) continue;
+
+    // If this word is an adjective/demonym form, only block when it is the
+    // entire title or follows a preposition like "of", "in", "from"
+    if (singleWordAdjectives.has(word)) {
+      if (words.length === 1) return true; // exact title match
+      const prev = i > 0 ? words[i - 1] : "";
+      if (["of", "in", "from", "about"].includes(prev)) return true;
+      continue; // adjective modifying another word — allow
     }
+
+    // Place-name noun — block regardless of position
+    return true;
   }
 
   return false;
